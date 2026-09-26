@@ -1,0 +1,10 @@
+{
+  "name": "codebase-constitution",
+  "version": "1.0.0",
+  "description": "Reverse-engineer any codebase into a living engineering constitution with invariants, ADRs, and agent rules.",
+  "author": "Mamdouh Aboammar",
+  "homepage": "https://github.com/imMamdouhaboammar/codebase-constitution",
+  "skills": ["skills/codebase-constitution"],
+  "install": "npx codebase-constitution install",
+  "tags": ["architecture", "reverse-engineering", "adr", "agent-rules", "constitution", "onboarding"]
+}

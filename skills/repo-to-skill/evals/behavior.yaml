@@ -1,0 +1,219 @@
+---
+# Behavior Eval Bank — codebase-constitution skill
+# Tests for Layer 3 (Behavior) of VALIDATE — observable output assertions
+
+skill: codebase-constitution
+version: "1.0.0"
+
+assertions:
+  # ── PASS 1: Topology Harvest ──────────────────────────────────────────────
+  - id: BEH-001
+    pass: 1
+    assertion: "CONSTITUTION.md Section 2 (Topology) contains language breakdown with percentages"
+    binary: true
+    evidence_required: true
+    critical: false
+    
+  - id: BEH-002
+    pass: 1
+    assertion: "Topology card includes test_ratio as a numeric value"
+    binary: true
+    evidence_required: true
+    critical: false
+
+  # ── PASS 2: Dependency Audit ─────────────────────────────────────────────
+  - id: BEH-010
+    pass: 2
+    assertion: "CONSTITUTION.md Section 4 (Dependencies) names the package manager used"
+    binary: true
+    evidence_required: false
+    critical: false
+    
+  - id: BEH-011
+    pass: 2
+    assertion: "Dependency section classifies at least 3 runtime dependencies with version"
+    binary: true
+    evidence_required: false
+    critical: false
+
+  # ── PASS 3: Architecture ─────────────────────────────────────────────────
+  - id: BEH-020
+    pass: 3
+    assertion: "CONSTITUTION.md Section 3 names a specific architecture style (not generic)"
+    binary: true
+    evidence_required: true
+    critical: true
+    
+  - id: BEH-021
+    pass: 3
+    assertion: "Architecture section includes at least one file path citation as evidence"
+    binary: true
+    evidence_required: true
+    critical: true
+    failure_class: "hallucination"
+    
+  - id: BEH-022
+    pass: 3
+    assertion: "When architecture is ambiguous, multiple candidates are listed with confidence scores"
+    binary: false
+    evidence_required: false
+    critical: false
+
+  # ── PASS 4: Decision Archaeology ─────────────────────────────────────────
+  - id: BEH-030
+    pass: 4
+    assertion: "At least 3 ADR files are created in docs/adr/"
+    binary: true
+    evidence_required: true
+    critical: true
+    
+  - id: BEH-031
+    pass: 4
+    assertion: "Each ADR has a status field (implicit | accepted | superseded | deprecated | hypothesis)"
+    binary: true
+    evidence_required: false
+    critical: false
+    
+  - id: BEH-032
+    pass: 4
+    assertion: "Each ADR cites at least one concrete file path or code location"
+    binary: true
+    evidence_required: true
+    critical: true
+    failure_class: "evidence_missing"
+
+  # ── PASS 5: Invariants ────────────────────────────────────────────────────
+  - id: BEH-040
+    pass: 5
+    assertion: "CONSTITUTION.md Section 5 contains at least 5 MUST-NEVER invariants"
+    binary: true
+    evidence_required: false
+    critical: true
+    
+  - id: BEH-041
+    pass: 5
+    assertion: "CONSTITUTION.md Section 5 contains at least 5 MUST-ALWAYS invariants"
+    binary: true
+    evidence_required: false
+    critical: true
+    
+  - id: BEH-042
+    pass: 5
+    assertion: "Each invariant includes an enforcement level (lint | type | test | runtime | ci | convention)"
+    binary: true
+    evidence_required: false
+    critical: false
+    
+  - id: BEH-043
+    pass: 5
+    assertion: "80% of invariants have a file path citation as evidence"
+    binary: false
+    threshold: 0.8
+    evidence_required: true
+    critical: true
+    failure_class: "evidence_missing"
+
+  # ── PASS 6: Conventions ───────────────────────────────────────────────────
+  - id: BEH-050
+    pass: 6
+    assertion: "CONSTITUTION.md Section 6 covers naming, error handling, and testing conventions"
+    binary: true
+    evidence_required: false
+    critical: false
+    
+  - id: BEH-051
+    pass: 6
+    assertion: "Convention confidence is classified (canonical | majority | observed)"
+    binary: true
+    evidence_required: false
+    critical: false
+
+  # ── PASS 7: Agent Rules ───────────────────────────────────────────────────
+  - id: BEH-060
+    pass: 7
+    assertion: "docs/agent-rules.yaml exists"
+    binary: true
+    evidence_required: false
+    critical: true
+    
+  - id: BEH-061
+    pass: 7
+    assertion: "agent-rules.yaml contains 15 or more rules across at least 4 categories"
+    binary: true
+    evidence_required: false
+    critical: true
+    
+  - id: BEH-062
+    pass: 7
+    assertion: "Each rule in agent-rules.yaml has an id, assertion, and agent_instruction field"
+    binary: true
+    evidence_required: false
+    critical: false
+    
+  - id: BEH-063
+    pass: 7
+    assertion: "At least 5 rules include a violation_example and compliant_example"
+    binary: true
+    evidence_required: false
+    critical: false
+
+  # ── PASS 8: Portability ───────────────────────────────────────────────────
+  - id: BEH-070
+    pass: 8
+    assertion: "CONSTITUTION.md Section 9 (Portability) lists status per host"
+    binary: true
+    evidence_required: false
+    critical: false
+    
+  - id: BEH-071
+    pass: 8
+    assertion: "No host is claimed as SUPPORTED_TESTED unless execution evidence is present"
+    binary: true
+    evidence_required: true
+    critical: true
+    failure_class: "false_claim"
+
+  # ── PASS 9: Assembly ─────────────────────────────────────────────────────
+  - id: BEH-080
+    pass: 9
+    assertion: "CONSTITUTION.md contains all 10 required sections"
+    binary: true
+    evidence_required: false
+    critical: true
+    
+  - id: BEH-081
+    pass: 9
+    assertion: "CONSTITUTION.md header includes generated date and source repo"
+    binary: true
+    evidence_required: false
+    critical: false
+    
+  - id: BEH-082
+    pass: 9
+    assertion: "No placeholder text like '{Project Name}' remains in final output"
+    binary: true
+    evidence_required: false
+    critical: true
+    failure_class: "incomplete_output"
+
+  # ── EVIDENCE RULES ────────────────────────────────────────────────────────
+  - id: BEH-090
+    pass: all
+    assertion: "Constitution contains no invented file paths (paths that do not exist in repo)"
+    binary: true
+    evidence_required: true
+    critical: true
+    failure_class: "hallucination"
+    
+  - id: BEH-091
+    pass: all
+    assertion: "Constitution contains no fabricated git SHAs or commit messages"
+    binary: true
+    evidence_required: true
+    critical: true
+    failure_class: "hallucination"
+
+summary:
+  total_assertions: 27
+  critical_assertions: 13
+  quality_gate: "All critical assertions must pass. Non-critical failures result in WARN."

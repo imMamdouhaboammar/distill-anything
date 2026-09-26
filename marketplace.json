@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "name": "codebase-constitution",
+  "display_name": "Codebase Constitution",
+  "description": "Reverse-engineer any codebase into a living engineering constitution. Extracts architecture decisions, invariants, conventions, and machine-readable agent rules from real code evidence — no hallucinations, every claim cited.",
+  "version": "1.0.0",
+  "author": "Mamdouh Aboammar",
+  "homepage_url": "https://github.com/imMamdouhaboammar/codebase-constitution",
+  "contact_email": "mamdouh@aboammar.dev",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 Mamdouh Aboammar",
+  "skills": [
+    {
+      "name": "codebase-constitution",
+      "path": "skills/codebase-constitution/SKILL.md",
+      "description": "Reverse-engineer any codebase into a reusable engineering constitution with invariants, ADRs, and agent rules."
+    }
+  ],
+  "capabilities_required": [
+    "file_read",
+    "file_write"
+  ],
+  "capabilities_optional": [
+    "shell_exec",
+    "python_exec"
+  ],
+  "trigger_phrases": [
+    "reverse-engineer this codebase into a constitution",
+    "generate a CONSTITUTION.md",
+    "extract engineering principles from this repo",
+    "produce an ADR backlog from the code",
+    "turn this codebase into agent rules",
+    "what are the invariants in this system",
+    "create an onboarding doc from the codebase"
+  ]
+}

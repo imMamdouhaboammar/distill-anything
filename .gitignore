@@ -1,0 +1,14 @@
+node_modules/
+*.log
+.DS_Store
+*.yaml.bak
+topology.yaml
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+dist/
+*.tgz
+.env
+.env.*
+!.env.example

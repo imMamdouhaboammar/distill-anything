@@ -1,0 +1,52 @@
+{
+  "name": "repo-to-skill-agent",
+  "version": "1.0.0",
+  "description": "Two-stage unified microservices engine: reverse-engineer any codebase into an engineering constitution and synthesize an operational agent skill end-to-end automatically.",
+  "author": "Mamdouh Aboammar <mamdouh@aboammar.dev>",
+  "license": "MIT",
+  "homepage": "https://github.com/imMamdouhaboammar/repo-to-skill",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imMamdouhaboammar/repo-to-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/imMamdouhaboammar/repo-to-skill/issues"
+  },
+  "keywords": [
+    "agent-skill",
+    "repo-to-skill",
+    "codebase-constitution",
+    "claude-code",
+    "cursor",
+    "codex",
+    "antigravity",
+    "skills-sh",
+    "architecture",
+    "reverse-engineering",
+    "adr",
+    "engineering-constitution",
+    "agent-rules",
+    "onboarding",
+    "invariants",
+    "ai-agent",
+    "bun"
+  ],
+  "bin": {
+    "repo-to-skill": "./bin/cli.js",
+    "codebase-constitution": "./bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "skills/",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "install-skill": "node bin/cli.js install",
+    "run": "node bin/cli.js run",
+    "validate": "python3 skills/codebase-constitution/scripts/validate_constitution.py ."
+  }
+}
