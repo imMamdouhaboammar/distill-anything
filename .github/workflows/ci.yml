@@ -4,149 +4,46 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
-  validate:
-    name: Validate Skill Package
+  check:
+    name: Typecheck, Test, and Binary Smoke
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          python-version: '3.11'
+          bun-version: latest
 
-      - name: Install PyYAML
-        run: pip install pyyaml
-
-      - name: Validate skill frontmatter
-        run: |
-          python3 -c "
-          import yaml
-          with open('skills/codebase-constitution/SKILL.md') as f:
-              content = f.read()
-          if not content.startswith('---'):
-              raise ValueError('SKILL.md missing YAML frontmatter')
-          parts = content.split('---', 2)
-          meta = yaml.safe_load(parts[1])
-          assert meta.get('name'), 'name is required'
-          assert meta.get('description'), 'description is required'
-          assert meta.get('version'), 'version is required'
-          assert meta.get('author'), 'author is required'
-          assert meta.get('copyright'), 'copyright is required'
-          print('✓ Frontmatter valid')
-          print(f'  Name: {meta[\"name\"]}')
-          print(f'  Version: {meta[\"version\"]}')
-          print(f'  Author: {meta[\"author\"]}')
-          "
-
-      - name: Check required reference files
-        run: |
-          REFS=(
-            "skills/codebase-constitution/references/harvest-protocol.md"
-            "skills/codebase-constitution/references/architecture-patterns.md"
-            "skills/codebase-constitution/references/decision-archaeology.md"
-            "skills/codebase-constitution/references/invariants-taxonomy.md"
-            "skills/codebase-constitution/references/convention-patterns.md"
-            "skills/codebase-constitution/references/agent-rule-format.md"
-            "skills/codebase-constitution/references/constitution-template.md"
-            "skills/codebase-constitution/references/dependency-patterns.md"
-          )
-          for f in "${REFS[@]}"; do
-            if [ ! -f "$f" ]; then
-              echo "✗ Missing: $f"
-              exit 1
-            else
-              echo "✓ Present: $f"
-            fi
-          done
-
-      - name: Check scripts
-        run: |
-          python3 -m py_compile skills/codebase-constitution/scripts/harvest.py
-          python3 -m py_compile skills/codebase-constitution/scripts/validate_constitution.py
-          python3 -m py_compile skills/codebase-constitution/scripts/generate_rules.py
-          python3 -m py_compile skills/codebase-constitution/scripts/extract_adrs.py
-          echo "✓ All scripts parse cleanly"
-
-      - name: Check adapters
-        run: |
-          ADAPTERS=(antigravity claude codex chatgpt cursor universal)
-          for a in "${ADAPTERS[@]}"; do
-            if [ ! -f "skills/codebase-constitution/adapters/${a}.md" ]; then
-              echo "✗ Missing adapter: ${a}.md"
-              exit 1
-            else
-              echo "✓ Adapter present: ${a}.md"
-            fi
-          done
-
-      - name: Check eval bank
-        run: |
-          python3 -c "
-          import yaml
-          for f in ['skills/codebase-constitution/evals/activation.yaml',
-                    'skills/codebase-constitution/evals/behavior.yaml']:
-              data = yaml.safe_load(open(f))
-              print(f'✓ {f} is valid YAML')
-          "
-
-      - name: Check CLI entrypoint
-        run: |
-          node --check bin/cli.js
-          echo "✓ CLI syntax valid"
-
-      - name: Run harvest smoke test
-        run: |
-          pip install pyyaml
-          python3 skills/codebase-constitution/scripts/harvest.py \
-            --root . \
-            --out /tmp/topology-test.yaml
-          python3 -c "
-          import yaml
-          d = yaml.safe_load(open('/tmp/topology-test.yaml'))
-          assert 'topology' in d
-          print('✓ Harvest output valid')
-          print(f'  Languages: {[l[\"name\"] for l in d[\"topology\"][\"languages\"][:3]]}')
-          "
-
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check no secrets in skill files
-        run: |
-          # Scan for common secret patterns in skill files
-          if grep -r "sk-[a-zA-Z0-9]\{20,\}\|AKIA[A-Z0-9]\{16\}\|ghp_[a-zA-Z0-9]\{36\}" skills/ 2>/dev/null | grep -v ".git"; then
-            echo "✗ Possible secrets found in skill files"
-            exit 1
-          fi
-          echo "✓ No secrets detected"
-
-      - name: Check no absolute paths in portable core
-        run: |
-          if grep -r "/Users/\|/home/\|C:\\\\Users\\" skills/codebase-constitution/SKILL.md 2>/dev/null; then
-            echo "✗ Absolute paths found in SKILL.md"
-            exit 1
-          fi
-          echo "✓ No absolute paths in portable core"
-
-  package:
-    name: Package Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
         with:
-          node-version: '20'
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
-      - name: Validate package.json
-        run: node -e "const p = require('./package.json'); console.log('✓ package.json valid:', p.name, p.version)"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-      - name: Check npm pack (dry run)
-        run: npm pack --dry-run 2>&1 | head -30
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Run unit tests
+        run: bun test
+
+      - name: Build binary and run smoke checks
+        run: |
+          bun run build:bin
+          ./dist/distill-anything --help
+          ./dist/distill-anything . --dry-run --json > /dev/null

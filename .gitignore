@@ -1,14 +1,32 @@
+# Dependencies
 node_modules/
+
+# Build & compilation outputs
+dist/
+*.tgz
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Logs & OS artifacts
 *.log
 .DS_Store
+
+# Coverage & temporary outputs
+coverage/
+.tmp/
+tmp/
 *.yaml.bak
 topology.yaml
+
+# Local agent state & skill test outputs
+.claude/
+.agents/skills/
+
+# Python artifacts
 __pycache__/
 *.pyc
 *.pyo
 .venv/
-dist/
-*.tgz
-.env
-.env.*
-!.env.example

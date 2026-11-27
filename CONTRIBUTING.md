@@ -1,71 +1,38 @@
-# Contributing to codebase-constitution
+# Contributing to Distill Anything
 
-**Copyright (c) 2026 Mamdouh Aboammar. All rights reserved.**
+Contributions are welcome. This guide covers local setup, testing expectations, and how to extend the pipeline.
 
-This project is open source under the MIT License. Contributions that strengthen evidence gates, add host adapters, or improve extraction scripts are welcome.
+## Prerequisites
 
----
+- [Bun](https://bun.sh) >= 1.2.0
+- Git
+- A configured model provider for live end-to-end runs (such as Codex CLI, or an API key for Anthropic, OpenAI, or Google). Unit tests run offline with deterministic fixtures and do not require an API key.
 
-## What to contribute
-
-| Area | Examples |
-|---|---|
-| New host adapters | VS Code Copilot, OpenCode, Windsurf |
-| Extraction improvements | Better ADR mining, richer convention detection |
-| Script enhancements | Faster harvest, more language coverage |
-| Eval bank expansion | New activation and behavior test cases |
-| Bug fixes | Evidence gate failures, false-positive invariant detection |
-
-## What not to contribute
-
-- PRs that relax evidence requirements (every claim must have a file citation)
-- PRs that add invented file paths or unverified claims to templates
-- Features that require an external API key or network call just to run
-
-## Setup
+## Local Setup
 
 ```bash
-git clone https://github.com/imMamdouhaboammar/codebase-constitution
-cd codebase-constitution
-# No npm install needed — the skill itself has no runtime dependencies
-# Scripts need Python 3 + PyYAML: pip install pyyaml
+git clone https://github.com/imMamdouhaboammar/repo-to-skill.git
+cd repo-to-skill
+bun install
+bun run check
 ```
 
-## Testing your change
+`bun run check` runs `bunx tsc --noEmit` followed by `bun test`.
 
-```bash
-# Validate skill frontmatter and references
-python3 skills/codebase-constitution/scripts/validate_constitution.py .
+## Branching and Pull Requests
 
-# Verify scripts parse cleanly
-python3 -m py_compile skills/codebase-constitution/scripts/harvest.py
-python3 -m py_compile skills/codebase-constitution/scripts/extract_adrs.py
-python3 -m py_compile skills/codebase-constitution/scripts/generate_rules.py
-python3 -m py_compile skills/codebase-constitution/scripts/validate_constitution.py
+1. Fork the repository and create a branch from `main`.
+2. Keep changes focused on a single concern.
+3. Ensure `bun run check` passes with zero errors.
+4. Any change to `prompts/` or pipeline stages (`src/stages/`) must include regression tests in `tests/unit/` covering the new or fixed behavior.
+5. Never commit hardcoded local paths, `.env` files, or credentials.
+6. Open a pull request describing what changed, why, and how it was verified.
 
-# Verify CLI
-node --check bin/cli.js
-```
+## Adding a Tree-Sitter WASM Grammar
 
-## Commit style
+`distill-anything` uses `web-tree-sitter` WASM grammars in `grammars/` for Stage 2 AST import-graph extraction (`src/stages/02-signals/ast-graph.ts`). To add a new language:
 
-Use conventional commits:
-
-```
-feat: add VS Code Copilot host adapter
-fix: handle empty migration directory in extract_adrs.py
-docs: clarify MUST-WHEN invariant format in taxonomy reference
-refactor: split harvest.py into separate language and build detectors
-```
-
-## Pull request checklist
-
-- [ ] All scripts parse cleanly (`python3 -m py_compile`)
-- [ ] No absolute paths in `SKILL.md` portable core
-- [ ] No secrets or credentials in any file
-- [ ] CI passes (validate + security + package checks)
-- [ ] PR description states which evidence gate or extraction pass the change affects
-
-## Copyright
-
-By contributing, you agree that your contributions will be licensed under the MIT License and attributed to this repository. The copyright notice `Copyright (c) 2026 Mamdouh Aboammar` remains in all files — your name appears in the git history and PR record.
+1. Obtain the compiled `tree-sitter-<lang>.wasm` binary compatible with `web-tree-sitter` (`0.20.8`) and place it in `grammars/`.
+2. Register the language extension mapping and `LANG_TO_WASM` entry in `src/stages/02-signals/ast-graph.ts` and `src/stages/01-ingest.ts`.
+3. Add import-extraction queries for the language in `src/stages/02-signals/ast-graph.ts` and code-fence mapping in `src/stages/05-compiler/render-pattern.ts`.
+4. Add unit tests in `tests/unit/` verifying import resolution and fan-in scoring on sample files for the new language.

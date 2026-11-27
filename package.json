@@ -1,7 +1,7 @@
 {
-  "name": "repo-to-skill-agent",
+  "name": "distill-anything",
   "version": "1.0.0",
-  "description": "Two-stage unified microservices engine: reverse-engineer any codebase into an engineering constitution and synthesize an operational agent skill end-to-end automatically.",
+  "description": "Distill Anything: reverse-engineer any codebase or findings into a grounded, novelty-verified Agent Skill powered by Codex CLI.",
   "author": "Mamdouh Aboammar <mamdouh@aboammar.dev>",
   "license": "MIT",
   "homepage": "https://github.com/imMamdouhaboammar/repo-to-skill",
@@ -13,40 +13,62 @@
     "url": "https://github.com/imMamdouhaboammar/repo-to-skill/issues"
   },
   "keywords": [
-    "agent-skill",
-    "repo-to-skill",
-    "codebase-constitution",
+    "agent-skills",
+    "distill-anything",
+    "codex",
     "claude-code",
     "cursor",
-    "codex",
     "antigravity",
-    "skills-sh",
-    "architecture",
+    "cli",
+    "ast",
+    "tree-sitter",
     "reverse-engineering",
-    "adr",
-    "engineering-constitution",
-    "agent-rules",
-    "onboarding",
-    "invariants",
-    "ai-agent",
-    "bun"
+    "architecture",
+    "code-analysis",
+    "bun",
+    "typescript"
   ],
   "bin": {
-    "repo-to-skill": "./bin/cli.js",
-    "codebase-constitution": "./bin/cli.js"
+    "distill-anything": "./bin/distill-anything.ts",
+    "distill": "./bin/distill-anything.ts"
   },
   "files": [
     "bin/",
+    "src/",
+    "prompts/",
     "skills/",
-    "LICENSE",
-    "README.md"
+    "grammars/",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "bun": ">=1.2.0"
   },
   "scripts": {
-    "install-skill": "node bin/cli.js install",
-    "run": "node bin/cli.js run",
-    "validate": "python3 skills/codebase-constitution/scripts/validate_constitution.py ."
+    "dev": "bun run bin/distill-anything.ts",
+    "distill": "bun run bin/distill-anything.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test",
+    "build:bin": "bun build --compile bin/distill-anything.ts --outfile dist/distill-anything",
+    "install:skill": "bun -e \"import { cpSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'; import { homedir } from 'node:os'; import { join, resolve } from 'node:path'; const src = resolve('skills/distill-anything'); for (const base of ['.claude/skills', '.agents/skills']) { const dir = join(homedir(), base); const dest = join(dir, 'distill-anything'); const legacy = join(dir, 'repo-to-skill'); mkdirSync(dir, { recursive: true }); rmSync(legacy, { recursive: true, force: true }); rmSync(dest, { recursive: true, force: true }); try { symlinkSync(src, dest); } catch { cpSync(src, dest, { recursive: true }); } console.log('Installed ->', dest); }\"",
+    "check": "bun run typecheck && bun run test"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.110",
+    "@ai-sdk/google": "^4.0.128",
+    "@ai-sdk/openai": "^4.0.125",
+    "ai": "^7.0.183",
+    "commander": "^15.1.0",
+    "fast-glob": "^3.3.3",
+    "ignore": "^7.0.17",
+    "js-tiktoken": "^1.0.21",
+    "web-tree-sitter": "0.20.8",
+    "zod": "^3.24",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.5",
+    "tree-sitter-wasms": "^0.1.13",
+    "typescript": "^7.0.2"
   }
 }

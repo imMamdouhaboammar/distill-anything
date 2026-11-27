@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 180" width="840" height="180">
+  <defs>
+    <linearGradient id="accent-l" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+  <rect width="840" height="180" rx="8" fill="#FFFFFF"/>
+  <!-- Pipeline glyph -->
+  <g transform="translate(60,52)" fill="none" stroke="url(#accent-l)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="8" width="22" height="22" rx="4" opacity="0.9"/>
+    <rect x="0" y="46" width="22" height="22" rx="4" opacity="0.9"/>
+    <line x1="22" y1="19" x2="34" y2="19"/>
+    <line x1="22" y1="57" x2="34" y2="57"/>
+    <rect x="34" y="27" width="26" height="22" rx="4" opacity="0.9"/>
+    <line x1="60" y1="38" x2="72" y2="38"/>
+    <polygon points="72,28 92,38 72,48" fill="url(#accent-l)" opacity="0.75"/>
+  </g>
+  <!-- Title -->
+  <text x="170" y="88" fill="#0F172A" font-family="'SF Mono','Fira Code','Cascadia Code',ui-monospace,monospace" font-size="36" font-weight="700" letter-spacing="-0.5">distill-anything</text>
+  <!-- Tagline -->
+  <text x="170" y="118" fill="#475569" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="15" font-weight="400">Reverse-engineer any codebase into a grounded, novelty-verified Agent Skill</text>
+  <!-- Subtle bottom rule -->
+  <line x1="60" y1="148" x2="780" y2="148" stroke="url(#accent-l)" stroke-width="1" opacity="0.25"/>
+</svg>

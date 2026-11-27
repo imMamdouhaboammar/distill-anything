@@ -1,0 +1,74 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in distill-anything
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting an issue. Please provide the details below so we can reproduce it.
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS (arm64)
+        - macOS (x64)
+        - Linux (x64)
+        - Linux (arm64)
+        - Windows (WSL2)
+    validations:
+      required: true
+
+  - type: input
+    id: bun_version
+    attributes:
+      label: Bun Version
+      description: Output of `bun --version`
+      placeholder: "1.4.4"
+    validations:
+      required: true
+
+  - type: input
+    id: codex_version
+    attributes:
+      label: Codex CLI Version (if applicable)
+      description: Output of `codex --version` or `N/A` if using another provider
+      placeholder: "1.0.7"
+    validations:
+      required: false
+
+  - type: input
+    id: command
+    attributes:
+      label: Command Run
+      description: Exact command executed (redact any secrets)
+      placeholder: "distill-anything ./my-repo --min-novelty 4"
+    validations:
+      required: true
+
+  - type: input
+    id: exit_code
+    attributes:
+      label: Exit Code
+      placeholder: "5"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What Happened
+      description: Describe the unexpected behavior and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: report_excerpt
+    attributes:
+      label: distill-report.json Excerpt / Terminal Output
+      description: Paste relevant terminal logs or excerpts from `distill-report.json`.
+      render: json
+    validations:
+      required: false
