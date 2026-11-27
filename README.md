@@ -21,6 +21,7 @@
 </p>
 
 <p align="center">
+  <a href="#use-cases">Use Cases</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="#how-the-5-stage-pipeline-works">How It Works</a> ·
   <a href="#workflow-b-turn-conversation-findings-into-a-verified-skill">From Findings</a> ·
@@ -71,6 +72,60 @@ $ distill-anything https://github.com/example/ring-buffer --name ring-buffer
 | **Blind Novelty Gate** | Blind baseline + head-to-head judge; drops patterns scoring below threshold | No | No | No |
 | **Anti-Trigger Restraint** | Every pattern requires concrete anti-triggers; A/B eval penalizes cargo-culting | Rarely present | N/A | No |
 | **Context Window Cap** | Hard caps: `SKILL.md` <= 1,200 tokens, each pattern <= 900 tokens | Uncapped or manually trimmed | Uncapped | Uncapped |
+
+---
+
+## Use Cases
+
+### Stop Paying the Context Tax on Raw Codebases
+
+Dumping entire repositories into an AI coding agent wastes tokens, dilutes attention, and invites cargo-culting. **`distill-anything`** reverse-engineers what actually makes a codebase work—distilling non-obvious architecture, invariants, and trade-offs into compact, citation-verified Agent Skills (`<= 1,200` tokens for `SKILL.md`, `<= 900` tokens per pattern) that load only when needed.
+
+### What It Delivers Out of the Box
+
+- **Deterministic First, LLM Second:** Stages 1 and 2 run `web-tree-sitter` AST parsing, import-graph centrality scoring, and git-diff mining at **zero LLM cost**, packing only the highest-signal 60k tokens.
+- **Zero Hallucinated Citations:** Every extracted pattern is verified against actual file lines on disk (with sliding-window drift correction). Unverifiable claims are automatically dropped.
+- **Blind Novelty Gate:** A blind judge solves the problem *without* seeing the repo, then scores the repo's pattern head-to-head. Textbook boilerplate never survives.
+- **Built-in Restraint (`Anti-Triggers`):** Every pattern ships with explicit *Skip When* rules and an A/B evaluation harness (`src/eval/runner.ts`) to prevent over-engineering.
+- **Full Cost & Provider Control:** Uses your local **Codex CLI** by default, or routes to Anthropic, OpenAI, Google Gemini, or Vertex AI—protected by `--dry-run` cost previews and hard `--max-budget` caps.
+
+### Real-World Use Cases
+
+- **Borrow Battle-Tested Patterns from Elite Open-Source Repos**
+  Extract production concurrency, memory-layout, or error-handling internals from repos like `tokio` without drowning your agent in 100k+ lines of source.
+  ```bash
+  distill-anything https://github.com/tokio-rs/tokio --name tokio-internals
+  ```
+
+- **Standardize Agents Across Your Monorepo & Team Conventions**
+  Point `--subpath` at your core package so every coding agent (Claude Code, Codex, Cursor, Antigravity) follows your exact architectural boundaries and idioms from day one.
+  ```bash
+  distill-anything ./my-monorepo --subpath packages/core --out .agents/skills
+  ```
+
+- **Scout an Entire GitHub Organization for `$0` LLM Cost**
+  Triage and rank up to 100 repositories by language, stars, and structural maturity before spending a single token on distillation.
+  ```bash
+  distill-anything scan-org vercel --lang typescript --min-stars 200
+  ```
+
+- **Synthesize One Unified Playbook Across Multiple Repos**
+  Distilled three different caching, RPC, or queue implementations? Merge them into a single deduplicated playbook (up to 15 patterns) with cross-repo synthesis.
+  ```bash
+  distill-anything merge .claude/skills/repo-a .claude/skills/repo-b --name unified-cache
+  ```
+
+- **Turn Hard-Won Debugging & Review Sessions into Permanent Skills**
+  Capture architectural discoveries from a long debugging transcript or PR review and ground them directly against the codebase—so your agent never repeats the same mistake twice.
+  ```bash
+  distill-anything from-findings ./notes/postmortem.md --repo . --name prod-invariants
+  ```
+
+- **Keep Skills Evergreen as Code Evolves**
+  Skip full re-distillation. Use `--update` to incrementally refresh an existing skill from the git delta since its last recorded commit.
+  ```bash
+  distill-anything ./my-project --update
+  ```
 
 ---
 
