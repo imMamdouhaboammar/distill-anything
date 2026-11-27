@@ -1,43 +1,43 @@
 ---
 name: distill-anything
-description: Distill repository architecture or conversation findings into a grounded, novelty-verified Agent Skill using `distill-anything` (Codex CLI default). Use when asked to "use distill-anything", "use repo-to-skill", "turn these findings into a skill", "distill this repo into a playbook", or "skillify this project".
+description: Distill repository architecture, GitHub orgs, or conversation findings into a grounded, novelty-verified Agent Skill using `distill-anything` (Codex CLI default). Use when asked to "use distill-anything", "scan this org", "merge these skills", "update this skill", "turn these findings into a skill", or "distill this repo".
 ---
 
 # Distill Anything Meta-Skill
 
-Convert repository code or session findings into a verified Agent Skill (`SKILL.md` + `references/patterns/*.md` + `distill-report.json`) via `distill-anything`.
+Convert codebases, GitHub organizations, or session findings into verified Agent Skills (`SKILL.md` + `references/patterns/*.md` + `distill-report.json`) via `distill-anything`.
 
 **CRITICAL**: NEVER hand-write an unverified `SKILL.md` from chat memory. Always run `distill-anything` so citations are grounded on disk and platitudes are filtered.
 
-## Path 1: From Findings in Current Session
+## Workflows
 
-1. Write structured findings to `/tmp/distill-findings.md` (mechanisms, trade-offs, exact file paths, verbatim snippets, repo path/URL).
-2. Run `distill-anything from-findings`:
+1. **From Findings in Current Session**:
+   Write structured findings to `/tmp/distill-findings.md`, run:
    ```bash
    distill-anything from-findings /tmp/distill-findings.md \
-     --repo <local-path-or-url> \
-     --out <target-project>/.claude/skills \
-     --name <kebab-case-slug>
+     --repo <local-path-or-url> --out <target>/.claude/skills --name <slug>
    ```
-   *(Pass `--allow-ungrounded` only if no repo exists; marks output `evidence: ungrounded_notes`.)*
-3. Delete `/tmp/distill-findings.md` after completion.
+   *(Use `--allow-ungrounded` only if no repo exists; delete `/tmp/distill-findings.md` afterward.)*
 
-## Path 2: From Raw Repository
+2. **From Raw Repository (or Incremental Update)**:
+   ```bash
+   distill-anything <repo-url-or-path> --out <target>/.claude/skills --name <slug>
+   # Incrementally update an existing skill from git delta:
+   distill-anything <repo-url-or-path> --out <target>/.claude/skills --name <slug> --update
+   ```
 
-```bash
-distill-anything <repo-url-or-path> \
-  --out <target-project>/.claude/skills \
-  --name <kebab-case-slug>
-```
-*(Use `.agents/skills` if the project uses `.agents/skills/`.)*
+3. **Org-Scale Radar (`scan-org`, zero LLM cost)**:
+   ```bash
+   distill-anything scan-org <org> --limit 20 --lang python --max-size-mb 150
+   ```
 
-## Provider & Options
+4. **Cross-Repo Synthesis (`merge`)**:
+   ```bash
+   distill-anything merge <skill-dir-1> <skill-dir-2> --name <unified-slug> --out <target>/.claude/skills
+   ```
+
+## Provider & Post-Run Report
 
 - Default provider: local **Codex CLI** (`distill-anything config` sets model & reasoning).
-- `--reasoning <low|medium|high|xhigh>` / `--judge-reasoning <effort>`: Per-run overrides.
-- `--min-novelty <1-5>`: Minimum novelty score (defaults: `4` repo, `3` from-findings).
-- `--model <provider:model>` / `--judge-model <id>`: Override provider (e.g. `codex:gpt-5.4`, `anthropic:claude-sonnet-4-5`).
-
-## Post-Run Report
-
-Read `<out>/<slug>/distill-report.json` and report: `patternsKept`, `patternsDropped` (count, stage, reason/noveltyScore), `groundingFailures` (`groundingMode`), and `totalCostUsd`.
+- Overrides: `--model <provider:model>`, `--reasoning <low|medium|high|xhigh>`, `--min-novelty <1-5>`.
+- Read `<out>/<slug>/distill-report.json` and report `patternsKept`, `patternsDropped`, `groundingFailures`, and `totalCostUsd`.

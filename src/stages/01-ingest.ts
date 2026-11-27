@@ -91,6 +91,8 @@ const EXT_TO_LANG: Record<string, string> = {
   ".hpp": "cpp",
   ".h": "cpp",
   ".c": "cpp",
+  ".cu": "cuda",
+  ".cuh": "cuda",
   ".md": "markdown",
 };
 
@@ -146,6 +148,7 @@ async function runGitAsync(
     cwd,
     stdout: "pipe",
     stderr: "pipe",
+    env: { ...process.env, GIT_LFS_SKIP_SMUDGE: "1" },
   });
   onSpawn?.(proc);
   const exitCode = await proc.exited;
@@ -159,7 +162,7 @@ async function runGitAsync(
 }
 
 function checkStrictTyping(analysisRoot: string, repoRoot: string, primaryLanguage: string): boolean {
-  if (["rust", "go", "cpp"].includes(primaryLanguage)) return true;
+  if (["rust", "go", "cpp", "cuda"].includes(primaryLanguage)) return true;
   for (const dir of [analysisRoot, repoRoot]) {
     const tsconfig = join(dir, "tsconfig.json");
     if (existsSync(tsconfig)) {

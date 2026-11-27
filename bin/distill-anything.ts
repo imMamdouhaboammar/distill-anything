@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { mkdirSync, writeFileSync } from "node:fs";
-import { basename, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { CommanderError } from "commander";
 import { ZodError } from "zod";
 import { parseCliArgs, type CliOptions } from "../src/cli/args";
@@ -17,6 +17,9 @@ import { extractPatternsFromFindings } from "../src/stages/03-miner/from-finding
 import { runNoveltyGate } from "../src/stages/04-novelty/judge";
 import { renderPatternFile } from "../src/stages/05-compiler/render-pattern";
 import { renderSkillIndex } from "../src/stages/05-compiler/render-skill";
+import { MergeInputError, mergeSkills } from "../src/stages/06-merge/synthesize";
+import { formatOrgScanTable, scanOrganization } from "../src/stages/org-scan/scanner";
+import { runIncrementalUpdate } from "../src/stages/update/incremental";
 import type { VerifiedPattern } from "../src/schemas/novelty";
 import type { RepoProfile } from "../src/schemas/repo-profile";
 import type { DistillReport, DroppedPatternLog, GroundingMode } from "../src/schemas/report";
@@ -97,13 +100,47 @@ async function main(): Promise<number> {
     return 0;
   }
 
+  if (options.mode === "scan-org") {
+    try {
+      const report = await scanOrganization({
+        org: options.org,
+        limit: options.limit,
+        lang: options.lang,
+        minStars: options.minStars,
+        maxSizeMb: options.maxSizeMb,
+        includeForks: options.includeForks,
+        includeArchived: options.includeArchived,
+        concurrency: options.concurrency,
+        onWarn: (msg) => reporter.warn(msg),
+        onInfo: (msg) => reporter.info(msg),
+      });
+
+      if (options.out) {
+        const outPath = resolve(options.out);
+        mkdirSync(dirname(outPath), { recursive: true });
+        writeFileSync(outPath, JSON.stringify(report, null, 2));
+        reporter.info(`Saved OrgScanReport -> ${outPath}`);
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        console.log(formatOrgScanTable(report));
+      }
+      return 0;
+    } catch (err) {
+      reporter.error(err instanceof Error ? err.message : String(err));
+      return 1;
+    }
+  }
+
   const budget = new BudgetLedger(options.maxBudget);
   const isDryRun = options.mode === "repo" && options.dryRun;
 
   let effectiveModel = options.model;
-  let effectiveJudgeModel = options.judgeModel;
+  let effectiveJudgeModel = options.mode === "merge" ? options.model : options.judgeModel;
   let effectiveReasoning: ReasoningEffort | undefined = options.reasoning;
-  let effectiveJudgeReasoning: ReasoningEffort | undefined = options.judgeReasoning;
+  let effectiveJudgeReasoning: ReasoningEffort | undefined = options.mode === "merge" ? undefined : options.judgeReasoning;
   let codexPath: string | undefined;
 
   if (!isDryRun) {
@@ -118,10 +155,12 @@ async function main(): Promise<number> {
     }
 
     const needsCodex =
-      options.reconfigure ||
+      (options.mode !== "merge" && options.reconfigure) ||
       !options.modelExplicit ||
       options.model.startsWith("codex:") ||
-      (!options.skipNovelty && (!options.judgeModelExplicit || options.judgeModel.startsWith("codex:")));
+      (options.mode !== "merge" &&
+        !options.skipNovelty &&
+        (!options.judgeModelExplicit || options.judgeModel.startsWith("codex:")));
 
     if (needsCodex) {
       let discovery: CodexDiscoveryResult;
@@ -136,14 +175,14 @@ async function main(): Promise<number> {
         throw err;
       }
 
-      if (options.reconfigure || (!savedConfig && !options.modelExplicit)) {
+      if ((options.mode !== "merge" && options.reconfigure) || (!savedConfig && !options.modelExplicit)) {
         if (process.stdin.isTTY && process.stdout.isTTY && !options.json) {
           savedConfig = await runInteractiveSetup(discovery, savedConfig);
         } else if (!savedConfig) {
           const defaults = resolveNonTtyDefaults();
           effectiveModel = toCodexModelId(defaults.model);
           effectiveReasoning = effectiveReasoning ?? defaults.reasoningEffort;
-          if (!options.judgeModelExplicit) {
+          if (options.mode !== "merge" && !options.judgeModelExplicit) {
             effectiveJudgeModel = toCodexModelId(defaults.judgeModel);
           }
           effectiveJudgeReasoning = effectiveJudgeReasoning ?? defaults.judgeReasoningEffort;
@@ -159,7 +198,7 @@ async function main(): Promise<number> {
         }
         effectiveReasoning = effectiveReasoning ?? savedConfig.reasoningEffort;
 
-        if (!options.judgeModelExplicit) {
+        if (options.mode !== "merge" && !options.judgeModelExplicit) {
           effectiveJudgeModel = toCodexModelId(savedConfig.judgeModel ?? savedConfig.model);
         }
         effectiveJudgeReasoning =
@@ -175,9 +214,10 @@ async function main(): Promise<number> {
     }
 
     try {
-      const modelsToCheck = options.skipNovelty
-        ? [effectiveModel]
-        : [effectiveModel, effectiveJudgeModel];
+      const modelsToCheck =
+        options.mode === "merge" || options.skipNovelty
+          ? [effectiveModel]
+          : [effectiveModel, effectiveJudgeModel];
       validateApiKeys(modelsToCheck);
     } catch (err) {
       if (err instanceof MissingApiKeyError || err instanceof InvalidModelError) {
@@ -185,6 +225,85 @@ async function main(): Promise<number> {
         return 2;
       }
       throw err;
+    }
+  }
+
+  if (options.mode === "merge") {
+    try {
+      reporter.info(`Merging skills into "${options.name}"...`);
+      const merged = await mergeSkills({
+        skillDirs: options.skillDirs,
+        outputSlug: options.name,
+        maxPatterns: options.maxPatterns,
+        modelId: effectiveModel,
+        reasoningEffort: effectiveReasoning,
+        codexPath,
+        budget,
+      });
+
+      const outSkillDir = resolve(options.out, options.name);
+      const patternsDir = join(outSkillDir, "references/patterns");
+      mkdirSync(patternsDir, { recursive: true });
+      for (const p of merged.compiledPatterns) {
+        writeFileSync(join(patternsDir, p.filename), p.markdown);
+      }
+      writeFileSync(join(outSkillDir, "SKILL.md"), merged.skillMd);
+
+      const totalCandidates = merged.loadedSkills.reduce((s, sk) => s + sk.patterns.length, 0);
+      const report: DistillReport = {
+        version: "1.0",
+        tool: "distill-anything",
+        provider: parseModelId(effectiveModel).provider,
+        profile: {
+          source: `merged:${merged.loadedSkills.map((s) => s.report.profile.skillSlug).join(",")}`,
+          repoName: options.name,
+          skillSlug: options.name,
+          commitSha: null,
+          subpath: ".",
+          analyzedAt: new Date().toISOString(),
+          primaryLanguage: merged.loadedSkills[0]?.report.profile.primaryLanguage ?? "unknown",
+          languages: [{ language: "multi", fileCount: merged.compiledPatterns.length, loc: 0, sharePercent: 100 }],
+          totalFilesScanned: merged.loadedSkills.length,
+          skippedOversizedFiles: [],
+          maturity: {
+            classification: "production",
+            hasCiWorkflows: true,
+            hasBenchmarks: false,
+            hasStrictTyping: true,
+            testToSourceRatio: 1,
+            experimentalMarkersPerKloc: 0,
+          },
+        },
+        outputPath: outSkillDir,
+        groundingMode: "verified_disk",
+        totalCandidatesExtracted: totalCandidates,
+        groundingFailures: 0,
+        patternsKept: merged.compiledPatterns.length,
+        patternsDropped: merged.droppedPatterns,
+        mergedFrom: merged.loadedSkills.map((s) => ({
+          skillSlug: s.report.profile.skillSlug,
+          repoName: s.report.profile.repoName,
+          source: s.report.profile.source,
+          commitSha: s.report.profile.commitSha,
+        })),
+        costs: budget.getEntries(),
+        totalCostUsd: Number(budget.getTotalCostUsd().toFixed(6)),
+        skillIndexTokens: merged.skillIndexTokens,
+      };
+      writeFileSync(join(outSkillDir, "distill-report.json"), JSON.stringify(report, null, 2));
+      reporter.printReport(report);
+      return 0;
+    } catch (err) {
+      if (err instanceof MergeInputError) {
+        reporter.error(err.message);
+        return 2;
+      }
+      if (err instanceof BudgetExceededError) {
+        reporter.error(err.message);
+        return 3;
+      }
+      reporter.error(err instanceof Error ? err.message : String(err));
+      return 1;
     }
   }
 
@@ -207,6 +326,44 @@ async function main(): Promise<number> {
 
       if (!ingest.isGitRepo) {
         reporter.warn("Git history unavailable or --no-git specified; running in degraded mode without commit mining.");
+      }
+
+      if (options.update && !options.dryRun) {
+        const inc = await runIncrementalUpdate({
+          repoRoot: ingest.repoRoot,
+          analysisRoot: ingest.analysisRoot,
+          outDir: options.out,
+          skillSlug: ingest.profile.skillSlug,
+          headSha: ingest.profile.commitSha,
+          modelId: effectiveModel,
+          judgeModelId: effectiveJudgeModel,
+          reasoningEffort: effectiveReasoning,
+          judgeReasoningEffort: effectiveJudgeReasoning,
+          codexPath,
+          budget,
+          minNovelty: options.minNovelty,
+          skipNovelty: options.skipNovelty,
+        });
+
+        if (inc.status === "up_to_date") {
+          reporter.info(`No new commits since ${inc.headSha.slice(0, 8)}.`);
+          return 0;
+        }
+        if (inc.status === "docs_only") {
+          reporter.info(
+            `Only docs/CI/lockfiles changed (${inc.fromSha.slice(0, 8)}..${inc.toSha.slice(0, 8)}); updated lastCommitSha with zero LLM calls.`,
+          );
+          if (options.json) console.log(JSON.stringify(inc.report, null, 2));
+          return 0;
+        }
+        if (inc.status === "updated") {
+          reporter.info(
+            `Incremental update complete (${inc.fromSha.slice(0, 8)}..${inc.toSha.slice(0, 8)}): promoted=${inc.promoted}, added=${inc.added}, deprecated=${inc.deprecated}`,
+          );
+          reporter.printReport(inc.report);
+          return 0;
+        }
+        reporter.warn(`${inc.reason}; falling back to full distillation run.`);
       }
 
       reporter.info("Extracting deterministic signals (AST + Git + Tests)...");

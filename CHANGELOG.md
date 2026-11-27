@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-11-28
+
+### Added
+
+- **GPU, Kernel & ML Systems AST Scoring**:
+  - Added `.cu` and `.cuh` (`cuda`) ingestion, `cuda` code-fence inference, `tree-sitter-cuda.wasm` detection with `tree-sitter-cpp.wasm` fallback (zero native C bindings), and CUDA craftsmanship heuristics (`__global__`, `__device__`, `__shared__`, `__syncthreads`, `__shfl_sync`, `cudaMemcpyAsync`, `cudaStream_t`, `mma.sync`, `cp.async`, `__launch_bounds__`, `<<<...>>>`).
+  - Boosted Python `craftDensity` for `@triton.jit`, `@triton.autotune`, `tl.load`/`tl.store`, `torch.compile`, `torch.autograd.Function`, `torch.library.custom_op`, `jax.jit`, `jax.vmap`, `jax.lax.scan`, `mmap`, `memoryview`, `multiprocessing.shared_memory`, `ctypes`/`cffi`, and `asyncio` synchronization primitives.
+- **Organization Radar (`distill-anything scan-org <org>`)**:
+  - Zero-LLM-cost GitHub organization triage with automatic token resolution (`GITHUB_TOKEN`, `GH_TOKEN`, `gh auth token`), pre-clone filtering (`--lang`, `--min-stars`, `--max-size-mb`, `--include-forks`, `--include-archived`, `--limit`), single-packfile shallow clones (`GIT_LFS_SKIP_SMUDGE=1`, `--depth 25 --no-tags --single-branch`), 45s per-repo timeouts, deterministic `signalDensityScore` ranking, and `--out` / `--json` output.
+- **Cross-Repo Skill Synthesis (`distill-anything merge`)**:
+  - Stage 6 synthesis combining 2+ distilled skills (or auto-discovered parent directory) into one unified domain playbook (`<= 1,200`-token `SKILL.md` grouped by category, `<= 900`-token pattern files), preserving conflicting trade-offs as explicit conditional decision branches and re-attaching verbatim disk-verified snippets without mutation.
+- **Incremental Repository Updates (`--update`)**:
+  - Zero-LLM early exits when `HEAD === lastCommitSha` or when only docs/CI/lockfiles changed, plus bounded (`<= 30,000` tokens) delta analysis for `promote`, `add` (with `grounder.ts` + Novelty Gate), `deprecate`, and `unchanged` patterns with `updateHistory` tracking in `distill-report.json`.
+
 ## [1.0.0] - 2026-11-28
 
 ### Added

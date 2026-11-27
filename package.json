@@ -1,6 +1,6 @@
 {
   "name": "distill-anything",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Distill Anything: reverse-engineer any codebase or findings into a grounded, novelty-verified Agent Skill powered by Codex CLI.",
   "author": "Mamdouh Aboammar <mamdouh@aboammar.dev>",
   "license": "MIT",

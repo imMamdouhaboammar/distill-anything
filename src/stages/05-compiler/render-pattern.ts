@@ -22,6 +22,8 @@ const EXT_TO_FENCE: Record<string, string> = {
   ".hpp": "cpp",
   ".h": "cpp",
   ".c": "c",
+  ".cu": "cuda",
+  ".cuh": "cuda",
   ".md": "markdown",
   ".sql": "sql",
   ".json": "json",

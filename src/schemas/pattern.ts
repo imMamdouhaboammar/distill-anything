@@ -23,11 +23,13 @@ export const PatternCategorySchema = z.enum([
   "api_boundary",
 ]);
 
+export const MaturityTagSchema = z.enum(["production_proven", "experimental_technique"]);
+
 export const CandidatePatternSchema = z.object({
   id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   title: z.string().min(8).max(90),
   category: PatternCategorySchema,
-  maturityTag: z.enum(["production_proven", "experimental_technique"]),
+  maturityTag: MaturityTagSchema,
   evidenceStatus: z.enum(["seen_explicit", "inferred_from_code"]),
   problemStatement: z
     .string()

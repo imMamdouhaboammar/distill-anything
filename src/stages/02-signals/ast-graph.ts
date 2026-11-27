@@ -39,10 +39,16 @@ async function ensureParserInit(): Promise<void> {
 }
 
 async function getLanguage(lang: string): Promise<Parser.Language | null> {
-  const wasmFile = LANG_TO_WASM[lang];
-  if (!wasmFile) return null;
   const cached = languageCache.get(lang);
   if (cached) return cached;
+
+  let wasmFile: string | undefined = LANG_TO_WASM[lang];
+  if (lang === "cuda") {
+    wasmFile = resolveGrammarPath("tree-sitter-cuda.wasm")
+      ? "tree-sitter-cuda.wasm"
+      : "tree-sitter-cpp.wasm";
+  }
+  if (!wasmFile) return null;
 
   const wasmPath = resolveGrammarPath(wasmFile);
   if (!wasmPath) return null;
@@ -58,10 +64,14 @@ const CRAFT_KEYWORDS: Record<string, RegExp> = {
   typescript: /\b(Proxy|Worker|SharedArrayBuffer|AbortController|WeakMap|WeakRef|FinalizationRegistry|extends Error)\b/g,
   tsx: /\b(Proxy|Worker|SharedArrayBuffer|AbortController|WeakMap|WeakRef|extends Error)\b/g,
   javascript: /\b(Proxy|Worker|SharedArrayBuffer|AbortController|WeakMap|WeakRef|Atomics)\b/g,
-  python: /\b(__slots__|metaclass|asyncio|ctypes|cffi|triton|autograd\.Function|__enter__|__exit__|contextmanager)\b/g,
+  python: /\b(__slots__|metaclass|asyncio|ctypes|cffi|triton|autograd\.Function|__enter__|__exit__|contextmanager|mmap|memoryview|multiprocessing\.shared_memory)\b/g,
   go: /\b(sync\.Pool|atomic\.|chan\b|select\s*\{|unsafe\.Pointer|sync\.Mutex|sync\.RWMutex)\b/g,
   cpp: /\b(template\s*<|std::atomic|mmap|__m128|__m256|alignas|std::unique_lock|allocator)\b/g,
+  cuda: /\b(__global__|__device__|__shared__|__syncthreads|__shfl_sync|__shfl_down_sync|__launch_bounds__|cudaMemcpyAsync|cudaStream_t|mma\.sync|cp\.async|threadIdx|blockIdx|blockDim|gridDim|template\s*<|std::atomic|alignas)\b|<<<[^>]+>>>/g,
 };
+
+const PYTHON_ML_SYSTEMS_PRIMITIVES =
+  /@triton\.(?:jit|autotune)\b|\btl\.(?:load|store)\b|\btorch\.(?:compile|autograd\.Function|library\.custom_op)\b|\bjax\.(?:jit|vmap|lax\.scan)\b|\bmultiprocessing\.shared_memory\b|\basyncio\.(?:Lock|Event|Semaphore|Condition|Queue|Barrier|BoundedSemaphore)\b|\b(?:mmap|memoryview|ctypes|cffi)\b/g;
 
 const CRAFT_NODE_TYPES = new Set([
   "unsafe_block",
@@ -111,7 +121,7 @@ function extractImportsFromText(content: string, language: string): string[] {
         }
       }
     }
-  } else if (language === "cpp") {
+  } else if (language === "cpp" || language === "cuda") {
     const re = /^\s*#include\s+"([^"]+)"/gm;
     for (const m of content.matchAll(re)) {
       if (m[1]) specs.push(m[1]);
@@ -332,7 +342,7 @@ function resolveInternalImport(
 
   const baseDir = dirname(fromRelPath);
   const rawJoined = normalize(join(baseDir, spec)).replace(/\\/g, "/");
-  for (const c of [rawJoined, `${rawJoined}.hpp`, `${rawJoined}.h`, `${rawJoined}.rs`, `${rawJoined}/mod.rs`]) {
+  for (const c of [rawJoined, `${rawJoined}.hpp`, `${rawJoined}.h`, `${rawJoined}.cuh`, `${rawJoined}.cu`, `${rawJoined}.rs`, `${rawJoined}/mod.rs`]) {
     if (knownPaths.has(c)) return c;
   }
   return null;
@@ -370,7 +380,7 @@ function smartTruncateFile(content: string, maxTokens: number): { numbered: stri
   // Keep type/interface/struct/class/trait signatures and 5 lines of context
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
-    if (/^\s*(export\s+)?(interface|type|class|struct|trait|enum|impl|def|fn|func|template)\b/.test(line)) {
+    if (/^\s*(export\s+)?(interface|type|class|struct|trait|enum|impl|def|fn|func|template|__global__|__device__)\b/.test(line)) {
       for (let j = i; j < Math.min(lines.length, i + 6); j++) {
         keepIndices.add(j);
       }
@@ -451,6 +461,9 @@ export async function extractCoreArchitectureFiles(params: {
     const regex = CRAFT_KEYWORDS[f.language];
     if (regex) {
       craftNodes += f.content.match(regex)?.length ?? 0;
+    }
+    if (f.language === "python") {
+      craftNodes += (f.content.match(PYTHON_ML_SYSTEMS_PRIMITIVES)?.length ?? 0) * 2;
     }
 
     const fanIn = fanInCount.get(f.relPath) ?? 0;

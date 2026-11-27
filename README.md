@@ -297,7 +297,9 @@ pub fn push(&self, item: T) -> Result<(), T> {
 
 | Command | Description |
 | :--- | :--- |
-| `distill-anything <source>` | Distill a local path or Git URL into an Agent Skill. |
+| `distill-anything <source>` | Distill a local path or Git URL into an Agent Skill (add `--update` for incremental delta updates). |
+| `distill-anything scan-org <org>` | Triage and rank repositories in a GitHub organization with zero LLM cost. |
+| `distill-anything merge <skill-dirs...>` | Synthesize 2+ distilled skills (or a parent dir) into one unified cross-repo playbook. |
 | `distill-anything from-findings <findings-file>` | Structure existing findings (Markdown, text, or JSON) into a verified skill. |
 | `distill-anything config` | Interactively configure default Codex CLI model and reasoning effort. |
 
@@ -320,7 +322,34 @@ pub fn push(&self, item: T) -> Result<(), T> {
 | `--min-novelty <1-5>` | number | `4` | Minimum novelty score to keep a pattern. |
 | `--skip-novelty` | flag | `false` | Bypass Stage 4 (marks output unverified). |
 | `--dry-run` | flag | `false` | Run Stages 1 and 2 only; print stats and cost estimate. |
+| `--update` | flag | `false` | Incrementally update an existing skill from git delta since `lastCommitSha`. |
 | `--no-git` | flag | `false` | Skip git history mining. |
+| `--json` | flag | `false` | Emit machine-readable report to stdout. |
+
+### Flags: `distill-anything scan-org <org>`
+
+| Flag | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--limit <n>` | number | `20` | Max recently pushed repos to inspect (max `100`). |
+| `--lang <language>` | string | None | Filter by primary language (`python`, `rust`, `typescript`, `cuda`, `c++`). |
+| `--min-stars <n>` | number | `50` | Skip repos with fewer than N stars. |
+| `--max-size-mb <n>` | number | `150` | Skip repos larger than N MB before cloning. |
+| `--include-forks` | flag | `false` | Include forked repositories. |
+| `--include-archived` | flag | `false` | Include archived repositories. |
+| `--concurrency <n>` | number | `3` | Max parallel shallow clones. |
+| `--out <file>` | string | None | Save ranked `OrgScanReport` JSON to file. |
+| `--json` | flag | `false` | Emit machine-readable JSON to stdout. |
+
+### Flags: `distill-anything merge <skill-dirs...>`
+
+| Flag | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `--name <slug>` | string | **Required** | Output unified skill slug (kebab-case). |
+| `--out <dir>` | string | `./.claude/skills` | Output directory. |
+| `--max-patterns <n>` | number | `12` | Max patterns in unified playbook (hard max `15`). |
+| `--model <id>` | string | `codex:<saved>` | Model for cross-repo synthesis. |
+| `--reasoning <effort>` | enum | Saved config | Override reasoning effort. |
+| `--max-budget <usd>` | number | `2.00` | Hard USD cap. |
 | `--json` | flag | `false` | Emit machine-readable report to stdout. |
 
 ### Flags: `distill-anything from-findings <findings-file>`
