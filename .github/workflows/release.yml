@@ -40,7 +40,7 @@ jobs:
           bun build --compile --target=${{ matrix.bun_target }} bin/distill-anything.ts --outfile release-assets/distill-anything-${{ matrix.target }}
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: binary-${{ matrix.target }}
           path: release-assets/distill-anything-${{ matrix.target }}
