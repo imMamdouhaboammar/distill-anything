@@ -11,8 +11,8 @@ Contributions are welcome. This guide covers local setup, testing expectations, 
 ## Local Setup
 
 ```bash
-git clone https://github.com/imMamdouhaboammar/repo-to-skill.git
-cd repo-to-skill
+git clone https://github.com/imMamdouhaboammar/distill-anything.git
+cd distill-anything
 bun install
 bun run check
 ```

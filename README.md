@@ -13,11 +13,11 @@
 
 <!-- Replace OWNER/REPO if the GitHub slug changes -->
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/imMamdouhaboammar/repo-to-skill?style=flat-square" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/imMamdouhaboammar/distill-anything?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/runtime-Bun%20%E2%89%A5%201.2-f9f1e1?style=flat-square&logo=bun" alt="Bun Runtime">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/default%20provider-Codex%20CLI-000000?style=flat-square" alt="Codex CLI Default">
-  <a href="https://github.com/imMamdouhaboammar/repo-to-skill/actions"><img src="https://img.shields.io/github/actions/workflow/status/imMamdouhaboammar/repo-to-skill/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
+  <a href="https://github.com/imMamdouhaboammar/distill-anything/actions"><img src="https://img.shields.io/github/actions/workflow/status/imMamdouhaboammar/distill-anything/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
 </p>
 
 <p align="center">
@@ -85,8 +85,8 @@ $ distill-anything https://github.com/example/ring-buffer --name ring-buffer
 **Install from source:**
 
 ```bash
-git clone https://github.com/imMamdouhaboammar/repo-to-skill.git
-cd repo-to-skill
+git clone https://github.com/imMamdouhaboammar/distill-anything.git
+cd distill-anything
 bun install
 ```
 

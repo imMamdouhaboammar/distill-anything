@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Questions & Discussions
-    url: https://github.com/imMamdouhaboammar/repo-to-skill/discussions
+    url: https://github.com/imMamdouhaboammar/distill-anything/discussions
     about: Ask usage questions or discuss architecture ideas in GitHub Discussions.
   - name: Documentation
-    url: https://github.com/imMamdouhaboammar/repo-to-skill#readme
+    url: https://github.com/imMamdouhaboammar/distill-anything#readme
     about: Check the README, CLI reference, and pipeline docs before opening an issue.
