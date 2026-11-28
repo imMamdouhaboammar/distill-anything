@@ -203,7 +203,15 @@ export function publishSkillToAwesomeRepo(params: {
   }
 
   const msg = `chore(skills): publish ${skillSlug} (${report.patternsKept} patterns)`;
-  const commitRes = runGit(["commit", "-m", msg], workDir);
+  const commitArgs: string[] = [];
+  if (!runGit(["config", "user.name"], workDir).stdout) {
+    commitArgs.push("-c", "user.name=distill-anything");
+  }
+  if (!runGit(["config", "user.email"], workDir).stdout) {
+    commitArgs.push("-c", "user.email=distill-anything@users.noreply.github.com");
+  }
+  commitArgs.push("commit", "-m", msg);
+  const commitRes = runGit(commitArgs, workDir);
   if (commitRes.status !== 0) {
     throw new PublishError(`git commit failed: ${commitRes.stderr}`);
   }
