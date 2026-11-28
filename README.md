@@ -58,7 +58,7 @@ $ distill-anything https://github.com/example/ring-buffer --name ring-buffer
 ```
 
 > [!NOTE]
-> `distill-anything` discovers and runs your local **Codex CLI** (`codex`) by default. On first run without a saved config, it launches interactive model and reasoning setup (`distill-anything config`). You can also pass `--model <provider>:<model>` to use Anthropic (`anthropic:claude-sonnet-4-5`), OpenAI (`openai:gpt-4.1`), Google (`google:gemini-2.5-pro`), or Vertex AI via `gcloud` (`gcloud:gemini-2.5-pro`).
+> `distill-anything` runs through your local **Codex CLI** (`codex`) exclusively. On first run without a saved config, it launches interactive model and reasoning setup (`distill-anything config`). Override per run with `--model codex:<model>` and `--reasoning <effort>`.
 
 ---
 
@@ -79,7 +79,7 @@ $ distill-anything https://github.com/example/ring-buffer --name ring-buffer
 
 ### Stop Paying the Context Tax on Raw Codebases
 
-Dumping entire repositories into an AI coding agent wastes tokens, dilutes attention, and invites cargo-culting. **`distill-anything`** reverse-engineers what actually makes a codebase work—distilling non-obvious architecture, invariants, and trade-offs into compact, citation-verified Agent Skills (`<= 1,200` tokens for `SKILL.md`, `<= 900` tokens per pattern) that load only when needed.
+Dumping an entire repository into an AI coding agent wastes tokens and invites cargo-culting. `distill-anything` extracts non-obvious architecture, invariants, and trade-offs into compact, citation-verified Agent Skills (`<= 1,200` tokens for `SKILL.md`, `<= 900` tokens per pattern) that load only when needed.
 
 ### What It Delivers Out of the Box
 
@@ -87,12 +87,13 @@ Dumping entire repositories into an AI coding agent wastes tokens, dilutes atten
 - **Zero Hallucinated Citations:** Every extracted pattern is verified against actual file lines on disk (with sliding-window drift correction). Unverifiable claims are automatically dropped.
 - **Blind Novelty Gate:** A blind judge solves the problem *without* seeing the repo, then scores the repo's pattern head-to-head. Textbook boilerplate never survives.
 - **Built-in Restraint (`Anti-Triggers`):** Every pattern ships with explicit *Skip When* rules and an A/B evaluation harness (`src/eval/runner.ts`) to prevent over-engineering.
-- **Full Cost & Provider Control:** Uses your local **Codex CLI** by default, or routes to Anthropic, OpenAI, Google Gemini, or Vertex AI—protected by `--dry-run` cost previews and hard `--max-budget` caps.
+- **Codex CLI + Budget Controls:** Runs through your local **Codex CLI** with `--dry-run` cost previews and hard `--max-budget` caps.
+- **Publish, Discuss & MCP Server:** Automatically publish distilled skills to an awesome-skills repository (`publish`), open attributed GitHub Discussions (`discuss`), or expose tools over stdio via `distill-anything-mcp`.
 
 ### Real-World Use Cases
 
-- **Borrow Battle-Tested Patterns from Elite Open-Source Repos**
-  Extract production concurrency, memory-layout, or error-handling internals from repos like `tokio` without drowning your agent in 100k+ lines of source.
+- **Extract Patterns from Open-Source Repos**
+  Pull production concurrency, memory-layout, or error-handling internals from repos like `tokio` without flooding your agent with 100k+ lines of source.
   ```bash
   distill-anything https://github.com/tokio-rs/tokio --name tokio-internals
   ```
@@ -132,12 +133,17 @@ Dumping entire repositories into an AI coding agent wastes tokens, dilutes atten
 ## Quick Start
 
 > [!IMPORTANT]
-> **Prerequisites**: [Bun](https://bun.sh) >= 1.2.0, Git, and one of the following:
-> - **Codex CLI** installed and authenticated (`codex login`), or
-> - An API key for another provider (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`), or
-> - `gcloud` CLI authenticated for Vertex AI.
+> **Prerequisites**: [Bun](https://bun.sh) >= 1.2.0, Git, and **Codex CLI** installed and authenticated (`codex login`).
 
-**Install from source:**
+**Install globally via Bun:**
+
+```bash
+bun add -g distill-anything
+# or run without installing globally:
+bunx distill-anything --help
+```
+
+**Or install from source:**
 
 ```bash
 git clone https://github.com/imMamdouhaboammar/distill-anything.git
@@ -167,9 +173,12 @@ The `--dry-run` flag runs only Stages 1 (Ingest) and 2 (Signal Extraction), prin
 bun run distill https://github.com/example/some-repo
 ```
 
-**Compile to a standalone binary:**
+**Build JS bundles or standalone binary:**
 
 ```bash
+bun run build
+# produces dist/distill-anything.js and dist/mcp-server.js
+
 bun run build:bin
 # produces dist/distill-anything
 ```
@@ -188,8 +197,8 @@ distill-anything ./my-project --subpath packages/core
 # Custom output directory and model
 distill-anything ./my-project \
   --out .agents/skills \
-  --model anthropic:claude-sonnet-4-5 \
-  --judge-model openai:gpt-4.1-mini
+  --model codex:gpt-5.4 \
+  --judge-model codex:gpt-5.4
 ```
 
 For monorepos, use `--subpath` to restrict analysis to a specific package. The output lands in `<--out>/<skill-slug>/` (default: `.claude/skills/<skill-slug>/`).
@@ -211,10 +220,11 @@ The `--repo` flag provides the repository for deterministic snippet grounding. W
 
 The default `--min-novelty` for `from-findings` is `3` (versus `4` for full repo distillation), since conversation findings tend to be pre-filtered by the engineer.
 
-**Installing the `distill-anything` meta-skill for coding agents:**
+**Installing the `distill-anything` skill & plugin bundle:**
 
 ```bash
 bun run install:skill
+bun run install:plugin
 ```
 
 This symlinks `skills/distill-anything/` into `~/.claude/skills/distill-anything` and `~/.agents/skills/distill-anything`, so agents like Claude Code and Codex automatically route prompts like "turn these findings into a skill" or "distill this repo" through the grounding and novelty pipeline instead of hallucinating a `SKILL.md` from chat memory.
@@ -355,8 +365,11 @@ pub fn push(&self, item: T) -> Result<(), T> {
 | `distill-anything <source>` | Distill a local path or Git URL into an Agent Skill (add `--update` for incremental delta updates). |
 | `distill-anything scan-org <org>` | Triage and rank repositories in a GitHub organization with zero LLM cost. |
 | `distill-anything merge <skill-dirs...>` | Synthesize 2+ distilled skills (or a parent dir) into one unified cross-repo playbook. |
+| `distill-anything publish <skill-dir>` | Publish a compiled skill directory to an awesome-distilled-skills repository. |
+| `distill-anything discuss <skill-dir>` | Open a GitHub Discussion with a distilled playbook (mentioning repo owners). |
 | `distill-anything from-findings <findings-file>` | Structure existing findings (Markdown, text, or JSON) into a verified skill. |
 | `distill-anything config` | Interactively configure default Codex CLI model and reasoning effort. |
+| `distill-anything-mcp` | Start the MCP stdio server exposing distill tools to AI agents. |
 
 ### Flags: `distill-anything <source>`
 
@@ -365,20 +378,24 @@ pub fn push(&self, item: T) -> Result<(), T> {
 | `--out <dir>` | string | `./.claude/skills` | Output directory. |
 | `--name <slug>` | string | Auto-derived | Override skill folder name (kebab-case). |
 | `--subpath <path>` | string | `.` | Restrict to a monorepo package. |
-| `--model <id>` | string | `codex:<saved>` | Primary model for Stage 3 mining. |
-| `--judge-model <id>` | string | `codex:<saved>` | Model for Stage 4 novelty judging. |
-| `--reasoning <effort>` | enum | Saved config | Override reasoning: `low`, `medium`, `high`, `xhigh`. |
+| `--model <id>` | string | `codex:<saved>` | Primary Codex model for Stage 3 mining. |
+| `--judge-model <id>` | string | `codex:<saved>` | Codex model for Stage 4 novelty judging. |
+| `--reasoning <effort>` | enum | Saved config | Override reasoning: `low`, `medium`, `high`, `xhigh`, `max`, `ultra`. |
 | `--judge-reasoning <effort>` | enum | Saved config | Override judge reasoning effort. |
 | `--reconfigure` | flag | `false` | Re-run interactive Codex setup before executing. |
-| `--max-budget <usd>` | number | `2.00` | Hard USD cap. Aborts gracefully on breach (exit 3). |
-| `--max-files <n>` | number | `20` | Maximum source files in SignalBundle. |
-| `--max-commits <n>` | number | `15` | Maximum high-signal git diffs in SignalBundle. |
+| `--max-budget <usd>` | number | `10.00` | Hard USD cap. Aborts gracefully on breach (exit 3). |
+| `--max-files <n>` | number | `40` | Maximum source files in SignalBundle. |
+| `--max-commits <n>` | number | `25` | Maximum high-signal git diffs in SignalBundle. |
 | `--git-depth <n>` | number | `150` | Shallow clone depth for remote repos. |
-| `--min-novelty <1-5>` | number | `4` | Minimum novelty score to keep a pattern. |
+| `--min-novelty <1-5>` | number | `3` | Minimum novelty score to keep a pattern. |
 | `--skip-novelty` | flag | `false` | Bypass Stage 4 (marks output unverified). |
 | `--dry-run` | flag | `false` | Run Stages 1 and 2 only; print stats and cost estimate. |
 | `--update` | flag | `false` | Incrementally update an existing skill from git delta since `lastCommitSha`. |
 | `--no-git` | flag | `false` | Skip git history mining. |
+| `--publish` | flag | `true` | Publish compiled skill to the configured awesome repo (`--no-publish` to skip). |
+| `--publish-repo <repo>` | string | None | Override awesome repository (`owner/repo` or Git URL). |
+| `--discuss` | flag | `false` | Open a new GitHub Discussion with the distilled playbook. |
+| `--discuss-target <target>` | enum | `auto` | Discussion target repo (`auto`, `source`, or `awesome`). |
 | `--json` | flag | `false` | Emit machine-readable report to stdout. |
 
 ### Flags: `distill-anything scan-org <org>`
@@ -432,9 +449,6 @@ All shared flags (`--out`, `--name`, `--subpath`, `--model`, `--judge-model`, `-
 | `DISTILL_MODEL` | Default model for non-interactive (non-TTY) environments. |
 | `DISTILL_REASONING` | Default reasoning effort for non-interactive environments. |
 | `DISTILL_PRICING_JSON` | JSON override for per-model token pricing (merged with built-in defaults). |
-| `ANTHROPIC_API_KEY` | API key when using `--model anthropic:<model>`. |
-| `OPENAI_API_KEY` | API key when using `--model openai:<model>`. |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | API key when using `--model google:<model>`. |
 
 ### Exit Codes
 
@@ -455,43 +469,34 @@ All shared flags (`--out`, `--name`, `--subpath`, `--model`, `--judge-model`, `-
 
 ```text
 distill-anything/
+├── agents/                            # Subagent definitions (grounding-auditor, skill-distiller)
 ├── bin/
-│   └── distill-anything.ts           # CLI entrypoint (shebang: #!/usr/bin/env bun)
+│   ├── distill-anything.ts            # CLI entrypoint (shebang: #!/usr/bin/env bun)
+│   └── mcp-server.ts                  # MCP stdio server entrypoint
 ├── grammars/                          # Bundled tree-sitter WASM grammars
-│   ├── tree-sitter-typescript.wasm
-│   ├── tree-sitter-python.wasm
-│   ├── tree-sitter-rust.wasm
-│   ├── tree-sitter-go.wasm
-│   └── tree-sitter-cpp.wasm
+├── hooks/                             # PreToolUse / PostToolUse lifecycle hooks
 ├── prompts/                           # Externalized prompt templates
-│   ├── miner-system.md
-│   ├── miner-user.md
-│   ├── novelty-baseline.md
-│   └── novelty-judge.md
-├── skills/
-│   └── distill-anything/SKILL.md      # Meta-skill for coding agent integration
+├── rules/                             # Plugin rules (AGENTS.md)
+├── skills/                            # Companion skills (distill-anything, merge, scan-org, verify)
 ├── src/
-│   ├── cli/
-│   │   ├── args.ts                    # Commander flag definitions + Zod validation
-│   │   ├── reporter.ts                # Terminal progress and cost display
-│   │   └── setup.ts                   # Interactive Codex model/reasoning setup
-│   ├── core/
-│   │   ├── budget.ts                  # Real-time USD and token ledger
-│   │   ├── codex-discovery.ts         # Codex CLI discovery + ~/.codex/config.toml reader
-│   │   ├── config.ts                  # Persistent config (~/.config/distill-anything/)
-│   │   ├── llm.ts                     # Provider wrapper (Codex, Anthropic, OpenAI, Google, Vertex)
-│   │   └── tokens.ts                  # Token counting and truncation
+│   ├── cli/                           # Commander flag definitions, reporter, interactive setup
+│   ├── core/                          # Budget, Codex discovery, config, attribution, tokens
+│   ├── mcp/                           # MCP server & skill directory verifier
 │   ├── schemas/                       # Zod schemas for all pipeline data
 │   ├── stages/
 │   │   ├── 01-ingest.ts               # Clone, profile, noise exclusion
 │   │   ├── 02-signals/                # AST graph, git miner, test hunter, bundler
 │   │   ├── 03-miner/                  # LLM extraction + deterministic grounder
 │   │   ├── 04-novelty/                # Blind baseline + head-to-head judge
-│   │   └── 05-compiler/               # Render SKILL.md + pattern files
-│   └── eval/
-│       ├── harness.ts                 # A/B evaluation task schema
-│       └── runner.ts                  # Control vs Treatment runner
-└── tests/
+│   │   ├── 05-compiler/               # Render SKILL.md + pattern files
+│   │   ├── 06-merge/                  # Cross-repo skill synthesis
+│   │   ├── org-scan/                  # GitHub org-scale radar
+│   │   ├── publish/                   # Awesome-repo publishing & GitHub Discussions
+│   │   └── update/                    # Incremental git-delta updates
+│   └── eval/                          # A/B evaluation harness
+├── plugin.json                        # Plugin manifest
+├── mcp_config.json                    # MCP server config
+└── hooks.json                         # Hook bindings
 ```
 
 ---
