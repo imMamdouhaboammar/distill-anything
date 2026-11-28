@@ -4,6 +4,7 @@ import type { BudgetLedger } from "../../core/budget";
 import type { ReasoningEffort } from "../../core/config";
 import { callStructuredLlm } from "../../core/llm";
 import { loadPromptTemplate, renderTemplate } from "../../core/prompts";
+import { collectOwnerMentions, extractGitHubRepo } from "../../core/attribution";
 import { countTokens } from "../../core/tokens";
 import {
   LoadedSkillPatternSchema,
@@ -168,14 +169,15 @@ export function parsePatternMarkdown(
       continue;
     }
 
-    citations.push({
+    const citation: (typeof citations)[number] = {
       filePath,
       startLine,
       endLine,
-      ...(commitSha ? { commitSha } : {}),
       verbatimSnippet,
       fenceLang,
-    });
+    };
+    if (commitSha) citation.commitSha = commitSha;
+    citations.push(citation);
   }
 
   const sourceCommitSha = report.profile.commitSha ?? citations[0]?.commitSha ?? "";
@@ -418,8 +420,13 @@ function buildMergedSkillMd(params: {
     params;
 
   const sourceList = loadedSkills
-    .map((s) => `${s.report.profile.repoName}@${(s.report.profile.commitSha ?? "unknown").slice(0, 8)}`)
+    .map((s) => {
+      const sha = (s.report.profile.commitSha ?? "unknown").slice(0, 8);
+      const ref = extractGitHubRepo(s.report.profile.source);
+      return ref ? `[\`${ref.slug}\`](${ref.url})@\`${sha}\`` : `${s.report.profile.repoName}@${sha}`;
+    })
     .join(", ");
+  const ownerMentions = collectOwnerMentions(loadedSkills.map((s) => s.report.profile.source));
   const topCategories = Array.from(new Set(patterns.map((p) => p.plan.category))).slice(0, 3).join(", ");
 
   const lines: string[] = [
@@ -431,6 +438,7 @@ function buildMergedSkillMd(params: {
     `# ${outputSlug} — Cross-Repo Engineering Playbook`,
     "",
     `- **Synthesized From (${loadedSkills.length} repos)**: ${sourceList}`,
+    ...(ownerMentions.length > 0 ? [`- **Source Credits**: ${ownerMentions.join(", ")}`] : []),
     `- **Operating Context**: ${operatingConstraints.join("; ")}`,
     "",
     "## Pattern Decision Table (Grouped by Category)",

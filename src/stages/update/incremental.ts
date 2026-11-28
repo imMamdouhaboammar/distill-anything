@@ -196,13 +196,15 @@ function loadExistingPatterns(patternsDir: string): ExistingPatternRecord[] {
       const fp = m[1]?.trim();
       if (!fp) continue;
       citedFiles.push(fp);
-      citations.push({
+      const cit: CandidatePattern["citations"][number] = {
         filePath: fp,
         startLine: Number(m[2]) || 1,
         endLine: Number(m[3]) || 1,
-        ...(m[4]?.trim() ? { commitSha: m[4].trim() } : {}),
         verbatimSnippet: m[5] ?? "code",
-      });
+      };
+      const sha = m[4]?.trim();
+      if (sha) cit.commitSha = sha;
+      citations.push(cit);
     }
 
     const section = (h: string) => {
@@ -217,6 +219,7 @@ function loadExistingPatterns(patternsDir: string): ExistingPatternRecord[] {
       pattern: {
         id: patternId,
         title,
+        // SAFETY: categoryRaw is parsed from the compiled pattern markdown Category field.
         category: categoryRaw as CandidatePattern["category"],
         maturityTag,
         evidenceStatus,

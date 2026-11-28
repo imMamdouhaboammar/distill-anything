@@ -142,10 +142,10 @@ describe("v1.0 polish sprint", () => {
   });
 
   describe("2. args.ts --min-novelty parsing & defaults", () => {
-    it("defaults minNovelty to 4 for repo mode and 3 for from-findings mode", () => {
+    it("defaults minNovelty to 3 for both repo mode and from-findings mode", () => {
       const repoOpts = parseCliArgs(["bun", "distill", "."]);
       expect(repoOpts.mode).toBe("repo");
-      if (repoOpts.mode === "repo") expect(repoOpts.minNovelty).toBe(4);
+      if (repoOpts.mode === "repo") expect(repoOpts.minNovelty).toBe(3);
 
       const findingsOpts = parseCliArgs(["bun", "distill", "from-findings", "notes.md", "--allow-ungrounded"]);
       expect(findingsOpts.mode).toBe("from-findings");

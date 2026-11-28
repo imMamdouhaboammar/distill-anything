@@ -49,7 +49,7 @@ export async function runNoveltyGate(params: {
   minNovelty?: number;
 }): Promise<{ kept: VerifiedPattern[]; dropped: DroppedPatternLog[] }> {
   const judgeTemplate = loadPromptTemplate("novelty-judge.md");
-  const minNovelty = params.minNovelty ?? 4;
+  const minNovelty = params.minNovelty ?? 3;
 
   const evaluations = await runWithConcurrency(params.patterns, 4, async (pattern) => {
     const blindBaseline = await generateBlindBaseline({
