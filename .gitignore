@@ -4,6 +4,8 @@ node_modules/
 # Build & compilation outputs
 dist/
 *.tgz
+*.tsbuildinfo
+release-assets/
 
 # Environment & secrets
 .env
@@ -20,10 +22,14 @@ coverage/
 tmp/
 *.yaml.bak
 topology.yaml
+*.sqlite*
 
 # Local agent state & skill test outputs
 .claude/
 .agents/skills/
+.worktrees/
+.anti-slop/
+.no-mistakes/
 
 # Python artifacts
 __pycache__/
