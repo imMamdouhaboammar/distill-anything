@@ -24,10 +24,14 @@ const SharedOptionsShape = {
   reasoning: ReasoningEffortSchema.optional(),
   judgeReasoning: ReasoningEffortSchema.optional(),
   reconfigure: z.boolean().default(false),
-  maxBudget: z.coerce.number().positive().default(2.0),
+  maxBudget: z.coerce.number().positive().default(10.0),
   gitDepth: z.coerce.number().int().positive().max(2000).default(150),
   skipNovelty: z.boolean().default(false),
   noGit: z.boolean().default(false),
+  publish: z.boolean().default(true),
+  publishRepo: z.string().min(1).optional(),
+  discuss: z.boolean().optional(),
+  discussTarget: z.enum(["auto", "source", "awesome"]).optional(),
   json: z.boolean().default(false),
 };
 
@@ -54,9 +58,9 @@ export const CliRepoOptionsSchema = z.object({
   mode: z.literal("repo").default("repo"),
   source: z.string().min(1, "Source repository path or URL is required"),
   ...SharedOptionsShape,
-  minNovelty: MinNoveltySchema.default(4),
-  maxFiles: z.coerce.number().int().positive().max(100).default(20),
-  maxCommits: z.coerce.number().int().nonnegative().max(50).default(15),
+  minNovelty: MinNoveltySchema.default(3),
+  maxFiles: z.coerce.number().int().positive().max(100).default(40),
+  maxCommits: z.coerce.number().int().nonnegative().max(50).default(25),
   dryRun: z.boolean().default(false),
   update: z.boolean().default(false),
 });
@@ -89,7 +93,34 @@ export const CliMergeOptionsSchema = z.object({
   model: z.string().default("codex:default"),
   modelExplicit: z.boolean().default(false),
   reasoning: ReasoningEffortSchema.optional(),
-  maxBudget: z.coerce.number().positive().default(2.0),
+  maxBudget: z.coerce.number().positive().default(10.0),
+  publish: z.boolean().default(true),
+  publishRepo: z.string().min(1).optional(),
+  discuss: z.boolean().optional(),
+  discussTarget: z.enum(["auto", "source", "awesome"]).optional(),
+  json: z.boolean().default(false),
+});
+
+export const CliPublishOptionsSchema = z.object({
+  mode: z.literal("publish"),
+  skillDir: z.string().min(1, "Skill directory path is required"),
+  repo: z.string().min(1).optional(),
+  branch: z.string().min(1).optional(),
+  setDefault: z.boolean().default(false),
+  discuss: z.boolean().optional(),
+  discussTarget: z.enum(["auto", "source", "awesome"]).optional(),
+  json: z.boolean().default(false),
+});
+
+export const CliDiscussOptionsSchema = z.object({
+  mode: z.literal("discuss"),
+  skillDir: z.string().min(1, "Skill directory path is required"),
+  target: z.enum(["auto", "source", "awesome"]).default("auto"),
+  repo: z.string().min(1).optional(),
+  category: z.string().min(1).optional(),
+  awesomeRepo: z.string().min(1).optional(),
+  open: z.boolean().default(false),
+  dryRun: z.boolean().default(false),
   json: z.boolean().default(false),
 });
 
@@ -97,6 +128,8 @@ export const CliOptionsSchema = z.union([
   CliConfigOptionsSchema,
   CliScanOrgOptionsSchema,
   CliMergeOptionsSchema,
+  CliPublishOptionsSchema,
+  CliDiscussOptionsSchema,
   CliRepoOptionsSchema,
   CliFromFindingsOptionsSchema,
 ]);
@@ -104,6 +137,8 @@ export const CliOptionsSchema = z.union([
 export type CliConfigOptions = z.infer<typeof CliConfigOptionsSchema>;
 export type CliScanOrgOptions = z.infer<typeof CliScanOrgOptionsSchema>;
 export type CliMergeOptions = z.infer<typeof CliMergeOptionsSchema>;
+export type CliPublishOptions = z.infer<typeof CliPublishOptionsSchema>;
+export type CliDiscussOptions = z.infer<typeof CliDiscussOptionsSchema>;
 export type CliRepoOptions = z.infer<typeof CliRepoOptionsSchema>;
 export type CliFromFindingsOptions = z.infer<typeof CliFromFindingsOptionsSchema>;
 export type CliOptions = z.infer<typeof CliOptionsSchema>;
@@ -169,15 +204,20 @@ export function parseCliArgs(argv: string[]): CliOptions {
     .option("--out <dir>", "Output directory where <slug>/ will be written", "./.claude/skills")
     .option("--max-patterns <n>", "Maximum patterns in unified playbook (default 12, hard max 15)", "12")
     .option("--model <id>", "Model for cross-repo synthesis (default: codex:<saved-model>)")
-    .option("--reasoning <effort>", "Override Codex reasoning effort (low|medium|high|xhigh)")
-    .option("--max-budget <usd>", "Hard USD cap", "2.00")
+    .option("--reasoning <effort>", "Override Codex thinking effort (low|medium|high|xhigh|max|ultra)")
+    .option("--max-budget <usd>", "Hard USD cap", "10.00")
+    .option("--publish", "Publish unified skill to the configured awesome repo (default: enabled)")
+    .option("--publish-repo <repo>", "Override awesome repository (owner/repo or Git URL)")
+    .option("--discuss", "Open a new GitHub Discussion with the unified playbook")
+    .option("--discuss-target <target>", "Discussion target repo (auto|source|awesome)")
     .option("--json", "Emit machine-readable report to stdout", false)
     .action((skillDirs: string[], _opts: Record<string, unknown>, cmd: Command) => {
       const opts = cmd.optsWithGlobals<Record<string, unknown>>();
       const modelExplicit =
         cmd.getOptionValueSource("model") === "cli" ||
         cmd.parent?.getOptionValueSource("model") === "cli";
-      parsedResult = CliMergeOptionsSchema.parse({
+      const publishExplicit = cmd.getOptionValueSource("publish") === "cli";
+      const rawOpts: Record<string, unknown> = {
         mode: "merge",
         skillDirs,
         name: opts.name,
@@ -188,7 +228,64 @@ export function parseCliArgs(argv: string[]): CliOptions {
         reasoning: opts.reasoning,
         maxBudget: opts.maxBudget,
         json: Boolean(opts.json),
-      });
+      };
+      if (publishExplicit) rawOpts.publish = Boolean(opts.publish);
+      if (opts.publishRepo) rawOpts.publishRepo = opts.publishRepo;
+      if (opts.discuss) rawOpts.discuss = true;
+      if (opts.discussTarget) rawOpts.discussTarget = opts.discussTarget;
+      parsedResult = CliMergeOptionsSchema.parse(rawOpts);
+    });
+
+  program
+    .command("publish")
+    .description("Publish a compiled skill directory to an awesome-distilled-skills repository")
+    .argument("<skill-dir>", "Path to compiled skill directory (containing SKILL.md and distill-report.json)")
+    .option("--repo <repo>", "Target awesome repository (owner/repo or Git URL)")
+    .option("--branch <branch>", "Target git branch (default: main)")
+    .option("--set-default", "Save --repo as the default auto-publish repository in config", false)
+    .option("--discuss", "Open a new GitHub Discussion with the published playbook")
+    .option("--discuss-target <target>", "Discussion target repo (auto|source|awesome)")
+    .option("--json", "Emit machine-readable JSON result to stdout", false)
+    .action((skillDir: string, _opts: Record<string, unknown>, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<Record<string, unknown>>();
+      const rawOpts: Record<string, unknown> = {
+        mode: "publish",
+        skillDir,
+        setDefault: Boolean(opts.setDefault),
+        json: Boolean(opts.json),
+      };
+      if (opts.repo) rawOpts.repo = opts.repo;
+      if (opts.branch) rawOpts.branch = opts.branch;
+      if (opts.discuss) rawOpts.discuss = true;
+      if (opts.discussTarget) rawOpts.discussTarget = opts.discussTarget;
+      parsedResult = CliPublishOptionsSchema.parse(rawOpts);
+    });
+
+  program
+    .command("discuss")
+    .description("Open a new GitHub Discussion with a distilled skill or playbook (mentioning repo owners)")
+    .argument("<skill-dir>", "Path to compiled skill directory (containing SKILL.md and distill-report.json)")
+    .option("--target <target>", "Target repository mode: auto (source first, then awesome), source, or awesome", "auto")
+    .option("--repo <repo>", "Explicit target GitHub repository (owner/repo or URL)")
+    .option("--category <name>", "Discussion category name or slug (e.g. \"Show and tell\", \"General\")")
+    .option("--awesome-repo <repo>", "Awesome repository linked in the discussion body")
+    .option("--open", "Open pre-filled New Discussion page in browser instead of calling GitHub API", false)
+    .option("--dry-run", "Preview generated discussion title, body, mentions, and URL without posting", false)
+    .option("--json", "Emit machine-readable JSON result to stdout", false)
+    .action((skillDir: string, _opts: Record<string, unknown>, cmd: Command) => {
+      const opts = cmd.optsWithGlobals<Record<string, unknown>>();
+      const rawOpts: Record<string, unknown> = {
+        mode: "discuss",
+        skillDir,
+        target: opts.target ?? "auto",
+        open: Boolean(opts.open),
+        dryRun: Boolean(opts.dryRun),
+        json: Boolean(opts.json),
+      };
+      if (opts.repo) rawOpts.repo = opts.repo;
+      if (opts.category) rawOpts.category = opts.category;
+      if (opts.awesomeRepo) rawOpts.awesomeRepo = opts.awesomeRepo;
+      parsedResult = CliDiscussOptionsSchema.parse(rawOpts);
     });
 
   program
@@ -200,22 +297,27 @@ export function parseCliArgs(argv: string[]): CliOptions {
     .option("--out <dir>", "Output directory where <skill-slug>/ will be written", "./.claude/skills")
     .option("--name <slug>", "Override output skill folder name (kebab-case)")
     .option("--subpath <path>", "Restrict analysis to a package inside a monorepo", ".")
-    .option("--model <id>", "Primary model for structuring findings (default: codex:<saved-model>)")
-    .option("--judge-model <id>", "Model for Stage 4 blind baseline and judging (default: codex:<saved-model>)")
-    .option("--reasoning <effort>", "Override Codex reasoning effort (low|medium|high|xhigh)")
-    .option("--judge-reasoning <effort>", "Override Codex judge reasoning effort (low|medium|high|xhigh)")
+    .option("--model <id>", "Primary Codex model for structuring findings (default: codex:<saved-or-flagship>)")
+    .option("--judge-model <id>", "Codex model for Stage 4 blind baseline and judging (default: codex:<saved-or-flagship>)")
+    .option("--reasoning <effort>", "Override Codex thinking effort (low|medium|high|xhigh|max|ultra)")
+    .option("--judge-reasoning <effort>", "Override Codex judge thinking effort (low|medium|high|xhigh|max|ultra)")
     .option("--reconfigure", "Re-run interactive Codex setup before executing", false)
-    .option("--max-budget <usd>", "Hard USD cap", "2.00")
+    .option("--max-budget <usd>", "Hard USD cap", "10.00")
     .option("--git-depth <n>", "Shallow clone depth for remote repositories", "150")
     .option("--min-novelty <1-5>", "Minimum novelty score (1-5) required to keep a pattern (default: 3)")
     .option("--skip-novelty", "Bypass Stage 4 (marks output unverified)", false)
     .option("--no-git", "Skip git metadata resolution")
+    .option("--publish", "Publish compiled skill to the configured awesome repo (default: enabled)")
+    .option("--publish-repo <repo>", "Override awesome repository (owner/repo or Git URL)")
+    .option("--discuss", "Open a new GitHub Discussion with the distilled playbook")
+    .option("--discuss-target <target>", "Discussion target repo (auto|source|awesome)")
     .option("--json", "Emit machine-readable report to stdout", false)
     .action((findingsFile: string, _opts: Record<string, unknown>, cmd: Command) => {
       const opts = cmd.optsWithGlobals<Record<string, unknown>>();
       const modelExplicit = cmd.getOptionValueSource("model") === "cli";
       const judgeModelExplicit = cmd.getOptionValueSource("judgeModel") === "cli";
-      parsedResult = CliFromFindingsOptionsSchema.parse({
+      const publishExplicit = cmd.getOptionValueSource("publish") === "cli";
+      const rawOpts: Record<string, unknown> = {
         mode: "from-findings",
         findingsFile,
         repo: opts.repo,
@@ -236,7 +338,12 @@ export function parseCliArgs(argv: string[]): CliOptions {
         skipNovelty: Boolean(opts.skipNovelty),
         noGit: opts.git === false,
         json: Boolean(opts.json),
-      });
+      };
+      if (publishExplicit) rawOpts.publish = Boolean(opts.publish);
+      if (opts.publishRepo) rawOpts.publishRepo = opts.publishRepo;
+      if (opts.discuss) rawOpts.discuss = true;
+      if (opts.discussTarget) rawOpts.discussTarget = opts.discussTarget;
+      parsedResult = CliFromFindingsOptionsSchema.parse(rawOpts);
     });
 
   program
@@ -244,25 +351,30 @@ export function parseCliArgs(argv: string[]): CliOptions {
     .option("--out <dir>", "Output directory where <skill-slug>/ will be written", "./.claude/skills")
     .option("--name <slug>", "Override output skill folder name (kebab-case)")
     .option("--subpath <path>", "Restrict analysis to a package inside a monorepo", ".")
-    .option("--model <id>", "Primary model for Stage 3 Pattern Mining (default: codex:<saved-model>)")
-    .option("--judge-model <id>", "Model for Stage 4 blind baseline and judging (default: codex:<saved-model>)")
-    .option("--reasoning <effort>", "Override Codex reasoning effort (low|medium|high|xhigh)")
-    .option("--judge-reasoning <effort>", "Override Codex judge reasoning effort (low|medium|high|xhigh)")
+    .option("--model <id>", "Primary Codex model for Stage 3 Pattern Mining (default: codex:<saved-or-flagship>)")
+    .option("--judge-model <id>", "Codex model for Stage 4 blind baseline and judging (default: codex:<saved-or-flagship>)")
+    .option("--reasoning <effort>", "Override Codex thinking effort (low|medium|high|xhigh|max|ultra)")
+    .option("--judge-reasoning <effort>", "Override Codex judge thinking effort (low|medium|high|xhigh|max|ultra)")
     .option("--reconfigure", "Re-run interactive Codex setup before executing", false)
-    .option("--max-budget <usd>", "Hard USD cap", "2.00")
-    .option("--max-files <n>", "Maximum source files included in SignalBundle", "20")
-    .option("--max-commits <n>", "Maximum high-signal git diffs included in SignalBundle", "15")
+    .option("--max-budget <usd>", "Hard USD cap", "10.00")
+    .option("--max-files <n>", "Maximum source files included in SignalBundle", "40")
+    .option("--max-commits <n>", "Maximum high-signal git diffs included in SignalBundle", "25")
     .option("--git-depth <n>", "Shallow clone depth for remote repositories", "150")
-    .option("--min-novelty <1-5>", "Minimum novelty score (1-5) required to keep a pattern (default: 4)")
+    .option("--min-novelty <1-5>", "Minimum novelty score (1-5) required to keep a pattern (default: 3)")
     .option("--skip-novelty", "Bypass Stage 4 (marks output unverified)", false)
     .option("--dry-run", "Run Stages 1 & 2 only; print SignalBundle stats and estimated USD cost", false)
     .option("--update", "Incrementally update an existing skill directory from git delta since lastCommitSha", false)
     .option("--no-git", "Skip git history mining for repositories without commit logs")
+    .option("--publish", "Publish compiled skill to the configured awesome repo (default: enabled)")
+    .option("--publish-repo <repo>", "Override awesome repository (owner/repo or Git URL)")
+    .option("--discuss", "Open a new GitHub Discussion with the distilled playbook")
+    .option("--discuss-target <target>", "Discussion target repo (auto|source|awesome)")
     .option("--json", "Emit machine-readable report to stdout", false)
     .action((source: string | undefined, opts: Record<string, unknown>, cmd: Command) => {
       const modelExplicit = cmd.getOptionValueSource("model") === "cli";
       const judgeModelExplicit = cmd.getOptionValueSource("judgeModel") === "cli";
-      parsedResult = CliRepoOptionsSchema.parse({
+      const publishExplicit = cmd.getOptionValueSource("publish") === "cli";
+      const rawOpts: Record<string, unknown> = {
         mode: "repo",
         source,
         out: opts.out,
@@ -285,7 +397,12 @@ export function parseCliArgs(argv: string[]): CliOptions {
         update: Boolean(opts.update),
         noGit: opts.git === false,
         json: Boolean(opts.json),
-      });
+      };
+      if (publishExplicit) rawOpts.publish = Boolean(opts.publish);
+      if (opts.publishRepo) rawOpts.publishRepo = opts.publishRepo;
+      if (opts.discuss) rawOpts.discuss = true;
+      if (opts.discussTarget) rawOpts.discussTarget = opts.discussTarget;
+      parsedResult = CliRepoOptionsSchema.parse(rawOpts);
     });
 
   program.parse(argv);
