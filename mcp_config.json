@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "distill-anything": {
+      "command": "bun",
+      "args": ["run", "bin/mcp-server.ts"],
+      "cwd": "."
+    }
+  }
+}

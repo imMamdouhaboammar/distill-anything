@@ -1,0 +1,21 @@
+{
+  "name": "distill-anything",
+  "displayName": "Distill Anything",
+  "version": "2.0.0",
+  "description": "Reverse-engineer repositories, GitHub orgs, and session findings into grounded, novelty-verified Agent Skills with MCP tools, CLI wrappers, specialist agents, and grounding hooks.",
+  "logo": "assets/logo.svg",
+  "author": {
+    "name": "Mamdouh Aboammar",
+    "url": "https://github.com/imMamdouhaboammar"
+  },
+  "homepage": "https://github.com/imMamdouhaboammar/distill-anything",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imMamdouhaboammar/distill-anything"
+  },
+  "suggestedPrompts": [
+    "Distill this repository into a grounded, novelty-verified Agent Skill",
+    "Scan a GitHub org for high-signal repositories with zero LLM cost",
+    "Turn our session findings into a verified skill grounded against disk"
+  ]
+}

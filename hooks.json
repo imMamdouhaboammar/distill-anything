@@ -1,0 +1,28 @@
+{
+  "distill-anything-lifecycle": {
+    "PreToolUse": [
+      {
+        "matcher": "write_file|edit_file|Write|Edit|MultiEdit|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"hooks/distill-hook.ts\" PreToolUse",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "write_file|edit_file|Write|Edit|MultiEdit|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"hooks/distill-hook.ts\" PostToolUse",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
