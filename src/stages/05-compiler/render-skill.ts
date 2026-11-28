@@ -1,6 +1,7 @@
 import type { RepoProfile } from "../../schemas/repo-profile";
 import type { VerifiedPattern } from "../../schemas/novelty";
 import type { GroundingMode } from "../../schemas/report";
+import { formatSourceAttribution } from "../../core/attribution";
 import { countTokens } from "../../core/tokens";
 
 const SKILL_INDEX_HARD_CAP = 1200;
@@ -24,7 +25,6 @@ function buildSkillMarkdown(params: {
   const { profile, operatingConstraints, patterns, maxCellWords, includeQuickRules, quickRulesLimit, unverified, groundingMode } = params;
   const topCategories = Array.from(new Set(patterns.map((p) => p.pattern.category))).slice(0, 3).join(", ");
   const constraintsSummary = limitWords(operatingConstraints[0] ?? "high reliability or performance is required", 16);
-  const commitShort = profile.commitSha ? profile.commitSha.slice(0, 8) : "no-git";
 
   const rows = patterns.map((vp, idx) => {
     const num = String(idx + 1).padStart(2, "0");
@@ -46,7 +46,7 @@ function buildSkillMarkdown(params: {
     "",
     `# ${profile.repoName} Engineering Playbook${unverified ? " (Unverified — Novelty Gate Skipped)" : ""}`,
     "",
-    `- **Source**: \`${profile.source}\` @ \`${commitShort}\``,
+    `- **Source**: ${formatSourceAttribution(profile.source, profile.commitSha)}`,
     `- **Maturity**: \`${profile.maturity.classification}\``,
     ...(groundingMode === "ungrounded_notes"
       ? ["- **Evidence**: `ungrounded_notes` (snippets not verified against disk)"]

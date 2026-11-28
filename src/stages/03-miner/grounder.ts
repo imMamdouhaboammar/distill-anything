@@ -64,14 +64,14 @@ function verifyCitation(
   const fileLines = normalizeLines(readFileSync(targetPath, "utf8"));
   const snippetNorm = normalizeLines(citation.verbatimSnippet).join("\n");
   const hasExplicitRange =
-    typeof citation.startLine === "number" &&
-    typeof citation.endLine === "number" &&
+    citation.startLine !== undefined &&
+    citation.endLine !== undefined &&
     citation.startLine >= 1 &&
     citation.endLine >= citation.startLine;
 
   if (hasExplicitRange) {
-    const startIdx = Math.max(0, citation.startLine - 1);
-    const endIdx = Math.min(fileLines.length, citation.endLine);
+    const startIdx = Math.max(0, citation.startLine! - 1);
+    const endIdx = Math.min(fileLines.length, citation.endLine!);
 
     if (startIdx < endIdx) {
       const diskSlice = fileLines.slice(startIdx, endIdx).join("\n");

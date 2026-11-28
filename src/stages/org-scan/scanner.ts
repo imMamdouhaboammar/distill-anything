@@ -388,7 +388,7 @@ export async function scanOrganization(options: OrgScanOptions): Promise<OrgScan
     .slice(0, 3)
     .map((r) => `distill-anything ${r.url}`);
 
-  return {
+  const report: OrgScanReport = {
     version: "2.0",
     org: options.org,
     scannedAt: new Date().toISOString(),
@@ -402,10 +402,13 @@ export async function scanOrganization(options: OrgScanOptions): Promise<OrgScan
     },
     authenticated: Boolean(token),
     totalCandidatesFound: candidates.length,
-    ...(skippedOversizedRepos.length > 0 ? { skippedOversizedRepos } : {}),
     repos: results,
     topRecommendations,
   };
+  if (skippedOversizedRepos.length > 0) {
+    report.skippedOversizedRepos = skippedOversizedRepos;
+  }
+  return report;
 }
 
 /** Formats a clean terminal table for an OrgScanReport. */

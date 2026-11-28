@@ -19,6 +19,16 @@ const DEFAULT_PRICING: Record<string, ModelPricing> = {
   "google:gemini-2.5-pro": { inputPerMillionUsd: 1.25, outputPerMillionUsd: 10.0 },
   "gcloud:gemini-2.5-flash": { inputPerMillionUsd: 0.15, outputPerMillionUsd: 0.6 },
   "gcloud:gemini-2.5-pro": { inputPerMillionUsd: 1.25, outputPerMillionUsd: 10.0 },
+  "codex:gpt-6.2-sol": { inputPerMillionUsd: 2.5, outputPerMillionUsd: 10.0 },
+  "codex:gpt-6.2-astra": { inputPerMillionUsd: 2.5, outputPerMillionUsd: 10.0 },
+  "codex:gpt-6.1-terra": { inputPerMillionUsd: 2.25, outputPerMillionUsd: 9.0 },
+  "codex:gpt-6.1-sol": { inputPerMillionUsd: 2.25, outputPerMillionUsd: 9.0 },
+  "codex:gpt-6-astra": { inputPerMillionUsd: 2.0, outputPerMillionUsd: 8.0 },
+  "codex:gpt-6-sol": { inputPerMillionUsd: 2.0, outputPerMillionUsd: 8.0 },
+  "codex:gpt-6-luna": { inputPerMillionUsd: 1.5, outputPerMillionUsd: 6.0 },
+  "codex:gpt-5.6-sol": { inputPerMillionUsd: 2.0, outputPerMillionUsd: 8.0 },
+  "codex:gpt-5.6-terra": { inputPerMillionUsd: 2.0, outputPerMillionUsd: 8.0 },
+  "codex:gpt-5.6-luna": { inputPerMillionUsd: 1.5, outputPerMillionUsd: 6.0 },
   "codex:gpt-5.4": { inputPerMillionUsd: 2.5, outputPerMillionUsd: 10.0 },
   "codex:gpt-5.3-codex": { inputPerMillionUsd: 2.0, outputPerMillionUsd: 8.0 },
   "codex:gpt-5.2-codex": { inputPerMillionUsd: 1.75, outputPerMillionUsd: 7.0 },
@@ -46,11 +56,21 @@ export class BudgetExceededError extends Error {
   }
 }
 
+import { z } from "zod";
+
+const PricingTableSchema = z.record(
+  z.string(),
+  z.object({
+    inputPerMillionUsd: z.number().nonnegative(),
+    outputPerMillionUsd: z.number().nonnegative(),
+  }),
+);
+
 function loadPricingTable(): Record<string, ModelPricing> {
   const custom = process.env.DISTILL_PRICING_JSON;
   if (!custom) return DEFAULT_PRICING;
   try {
-    const parsed = JSON.parse(custom) as Record<string, ModelPricing>;
+    const parsed = PricingTableSchema.parse(JSON.parse(custom));
     return { ...DEFAULT_PRICING, ...parsed };
   } catch {
     return DEFAULT_PRICING;

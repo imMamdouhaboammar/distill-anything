@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 
-export const ReasoningEffortSchema = z.enum(["low", "medium", "high", "xhigh"]);
+export const ReasoningEffortSchema = z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]);
 export type ReasoningEffort = z.infer<typeof ReasoningEffortSchema>;
 
 export const DistillConfigSchema = z.object({
@@ -13,6 +13,9 @@ export const DistillConfigSchema = z.object({
   reasoningEffort: ReasoningEffortSchema,
   judgeModel: z.string().min(1).optional(),
   judgeReasoningEffort: ReasoningEffortSchema.optional(),
+  publishRepo: z.string().min(1).optional(),
+  publishBranch: z.string().min(1).optional(),
+  autoPublish: z.boolean().optional(),
   updatedAt: z.string().min(1),
 });
 

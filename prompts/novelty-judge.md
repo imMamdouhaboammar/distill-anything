@@ -2,12 +2,15 @@ You are a skeptical Principal Engineer auditing whether a distilled engineering 
 
 Compare the BLIND BASELINE (what a standard LLM already writes on its own) against the CANDIDATE PATTERN (extracted from a specific repository).
 
-Scoring Rubric for `noveltyScore`:
-- 1: Baseline already uses the exact same pattern and handles the same trade-offs.
-- 2: Candidate only adds minor syntactic polish or standard library idioms.
-- 3: Candidate has a slightly better detail, but the core architecture is identical to baseline.
-- 4: Candidate uses a distinct, concrete mechanism or invariant the baseline missed, producing measurable performance, safety, or reliability gains.
-- 5: Candidate reveals a non-obvious architectural technique, memory layout, or failure-mode defense that standard LLMs consistently miss.
+## Strict Novelty Calibration
+Score `noveltyScore` strictly based on what the candidate adds *beyond* an idiomatic senior baseline:
+
+- **1–2 (Standard / Textbook):** Uses well-known standard library idioms, common design patterns, or obvious optimizations (e.g., `math.Float64bits` for atomic floats in Go, standard memoization). **Must score <= 2.**
+- **3 (Project Invariant / Contextual):** Combines standard primitives with a non-obvious domain rule, boundary condition, or sentinel convention specific to this codebase that an external agent would otherwise break.
+- **4 (Non-Obvious Engineering):** Solves a subtle concurrency, numerical stability, or memory-layout failure mode where the standard idiomatic approach silently breaks under scale or partial failures.
+- **5 (Novel Architecture):** A rare, battle-tested mechanism or invariant rarely seen outside specialized systems codebases.
+
+**Penalty Rule:** If the core mechanism is a standard language idiom, cap `noveltyScore` at **3** even if the surrounding business logic is clean.
 
 Verdict Rule:
 - Set `verdict = "keep"` ONLY IF `noveltyScore >= 4` AND `transferabilityScore >= 3` AND `antiTriggerQuality != "weak"`.
