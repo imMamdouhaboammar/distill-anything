@@ -3,11 +3,16 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseCliArgs } from "../../src/cli/args";
-import { resolveNonTtyDefaults } from "../../src/cli/setup";
+import { CODEX_STANDARD_MODELS, resolveLatestFlagshipModel, resolveNonTtyDefaults } from "../../src/cli/setup";
 import { BudgetLedger } from "../../src/core/budget";
-import { CodexNotFoundError, discoverCodex, readCodexConfigToml } from "../../src/core/codex-discovery";
+import {
+  CodexNotFoundError,
+  discoverCodex,
+  readCodexConfigToml,
+  readCodexModelsCache,
+} from "../../src/core/codex-discovery";
 import { DistillConfigSchema, getConfigPath, loadConfig, saveConfig, type DistillConfig } from "../../src/core/config";
-import { buildCodexExecArgs } from "../../src/core/llm";
+import { InvalidModelError, buildCodexExecArgs, parseModelId, validateApiKeys } from "../../src/core/llm";
 
 const tempDirs: string[] = [];
 
@@ -128,20 +133,32 @@ describe("Codex config, discovery, and CLI wiring", () => {
     const fakeCodex = join(dir, "codex");
     writeFileSync(fakeCodex, "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"codex-cli 0.166.0\"; exit 0; fi\nexit 1\n", { mode: 0o755 });
 
-    // Unit check for resolveNonTtyDefaults
+    // Unit check for resolveNonTtyDefaults (defaults to latest flagship model)
     expect(resolveNonTtyDefaults()).toEqual({
-      model: "default",
+      model: CODEX_STANDARD_MODELS[0],
       reasoningEffort: "medium",
-      judgeModel: "default",
+      judgeModel: CODEX_STANDARD_MODELS[0],
       judgeReasoningEffort: "low",
     });
 
-    process.env.DISTILL_MODEL = "codex:gpt-5.4";
-    process.env.DISTILL_REASONING = "high";
+    expect(
+      resolveNonTtyDefaults({
+        flagshipModel: "gpt-6.2-sol",
+        availableModels: [],
+      }),
+    ).toEqual({
+      model: "gpt-6.2-sol",
+      reasoningEffort: "medium",
+      judgeModel: "gpt-6.2-sol",
+      judgeReasoningEffort: "low",
+    });
+
+    process.env.DISTILL_MODEL = "codex:gpt-6.2-astra";
+    process.env.DISTILL_REASONING = "ultra";
     expect(resolveNonTtyDefaults()).toEqual({
-      model: "gpt-5.4",
-      reasoningEffort: "high",
-      judgeModel: "gpt-5.4",
+      model: "gpt-6.2-astra",
+      reasoningEffort: "ultra",
+      judgeModel: "gpt-6.2-astra",
       judgeReasoningEffort: "low",
     });
 
@@ -205,10 +222,66 @@ describe("Codex config, discovery, and CLI wiring", () => {
 
   it("prices Codex GPT models accurately without falling back to zero", () => {
     const budget = new BudgetLedger(10);
-    for (const model of ["codex:gpt-5.4", "codex:gpt-5.3-codex", "codex:gpt-5.2-codex", "codex:o3"]) {
+    for (const model of [
+      "codex:gpt-6.2-sol",
+      "codex:gpt-6.2-astra",
+      "codex:gpt-6.1-terra",
+      "codex:gpt-5.4",
+      "codex:gpt-5.3-codex",
+      "codex:o3",
+    ]) {
       const p = budget.getPricing(model);
       expect(p.inputPerMillionUsd).toBeGreaterThan(0);
       expect(p.outputPerMillionUsd).toBeGreaterThan(0);
+    }
+  });
+
+  it("discovers visible flagship models sorted by priority from models_cache.json", () => {
+    const dir = makeTempDir();
+    const cachePath = join(dir, "models_cache.json");
+    writeFileSync(
+      cachePath,
+      JSON.stringify({
+        models: [
+          { slug: "gpt-hidden", display_name: "Hidden", visibility: "hide", priority: 0 },
+          {
+            slug: "gpt-6.2-astra",
+            display_name: "GPT-6.2-Astra",
+            visibility: "list",
+            priority: 2,
+            default_reasoning_level: "medium",
+            supported_reasoning_levels: [{ effort: "low" }, { effort: "medium" }, { effort: "high" }],
+          },
+          {
+            slug: "gpt-6.2-sol",
+            display_name: "GPT-6.2-Sol",
+            visibility: "list",
+            priority: 1,
+            default_reasoning_level: "high",
+            supported_reasoning_levels: [{ effort: "low" }, { effort: "medium" }, { effort: "high" }, { effort: "ultra" }],
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const models = readCodexModelsCache(cachePath);
+    expect(models.map((m) => m.slug)).toEqual(["gpt-6.2-sol", "gpt-6.2-astra"]);
+    expect(models[0]?.supportedReasoningLevels).toEqual(["low", "medium", "high", "ultra"]);
+    expect(resolveLatestFlagshipModel({ flagshipModel: models[0]?.slug, availableModels: models })).toBe("gpt-6.2-sol");
+  });
+
+  it("enforces Codex CLI only and rejects external API providers", () => {
+    expect(parseModelId("codex:gpt-6.2-sol")).toEqual({ provider: "codex", modelName: "gpt-6.2-sol" });
+    for (const apiModel of [
+      "openai:gpt-4.1",
+      "anthropic:claude-sonnet-4-5",
+      "google:gemini-2.5-flash",
+      "gcloud:gemini-2.5-pro",
+      "gpt-6.2-sol",
+    ]) {
+      expect(() => parseModelId(apiModel)).toThrow(InvalidModelError);
+      expect(() => validateApiKeys([apiModel])).toThrow(InvalidModelError);
     }
   });
 });

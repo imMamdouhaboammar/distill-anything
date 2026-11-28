@@ -47,7 +47,9 @@ describe("Layer 2: Adversarial & Edge-Case Tests", () => {
     expect(stderr).toContain("escapes repository root");
   });
 
-  it("exits with code 3 when --max-budget 0.001 is exceeded before API call", async () => {
+  it("exits with code 3 when --max-budget 0.001 is exceeded before Codex CLI call", async () => {
+    const fakeCodex = join(largeTokenDir, ".fake-codex");
+    writeFileSync(fakeCodex, "#!/bin/sh\necho 'codex-cli 0.166.0'\n", { mode: 0o755 });
     const proc = Bun.spawn(
       [
         "bun",
@@ -57,13 +59,13 @@ describe("Layer 2: Adversarial & Edge-Case Tests", () => {
         "--max-budget",
         "0.001",
         "--model",
-        "openai:gpt-4.1",
+        "codex:gpt-6.2-sol",
         "--judge-model",
-        "openai:gpt-4.1-mini",
+        "codex:gpt-6.1-terra",
         "--no-git",
       ],
       {
-        env: { ...process.env, OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "sk-dummy-test-key" },
+        env: { ...process.env, DISTILL_CODEX_PATH: fakeCodex },
         stdout: "pipe",
         stderr: "pipe",
       },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { BudgetExceededError, BudgetLedger } from "../../src/core/budget";
+import { loadPromptTemplate, renderTemplate } from "../../src/core/prompts";
 import { passesNoveltyThreshold } from "../../src/stages/04-novelty/judge";
 
 describe("BudgetLedger", () => {
@@ -45,5 +46,35 @@ describe("Novelty Gate deterministic threshold", () => {
         reasoning: "Weak anti-triggers should be rejected.",
       }),
     ).toBe(false);
+  });
+});
+
+describe("Novelty Gate prompt calibration", () => {
+  it("renders novelty-baseline.md with senior idiomatic standard and no unresolved placeholders", () => {
+    const rendered = renderTemplate(loadPromptTemplate("novelty-baseline.md"), {
+      primaryLanguage: "go",
+      problemStatement: "Publish an updated float64 setting concurrently.",
+    });
+    expect(rendered).toContain("idiomatic, production-grade solution");
+    expect(rendered).toContain("senior engineer in go");
+    expect(rendered).not.toMatch(/\{\{[a-zA-Z0-9_]+\}\}/);
+  });
+
+  it("renders novelty-judge.md with Strict Novelty Calibration and Penalty Rule", () => {
+    const rendered = renderTemplate(loadPromptTemplate("novelty-judge.md"), {
+      problemStatement: "Concurrent float64 setting update",
+      blindBaseline: "Use atomic.Uint64 with math.Float64bits",
+      title: "Atomic float reset",
+      category: "concurrency",
+      naiveApproach: "Mutex",
+      repoApproach: "math.Float64bits",
+      tradeOffs: "Single scalar only",
+      whenToApply: "Independent scalar",
+      antiTriggers: "Multi-field atomic update",
+      transferableRule: "Normalize sentinel before atomic store",
+    });
+    expect(rendered).toContain("Strict Novelty Calibration");
+    expect(rendered).toContain("Penalty Rule");
+    expect(rendered).not.toMatch(/\{\{[a-zA-Z0-9_]+\}\}/);
   });
 });

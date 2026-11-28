@@ -1,6 +1,26 @@
 import { accessSync, constants, existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { z } from "zod";
+
+const CodexModelEntrySchema = z
+  .object({
+    visibility: z.string().optional(),
+    slug: z.string().optional(),
+    display_name: z.string().optional(),
+    priority: z.number().finite().optional(),
+    default_reasoning_level: z.string().optional(),
+    supported_reasoning_levels: z
+      .array(z.object({ effort: z.string().optional() }).passthrough())
+      .optional(),
+  })
+  .passthrough();
+
+const CodexModelsCacheSchema = z
+  .object({
+    models: z.array(CodexModelEntrySchema).optional(),
+  })
+  .passthrough();
 
 export class CodexNotFoundError extends Error {
   constructor(message: string) {
@@ -14,11 +34,21 @@ export interface CodexTomlDefaults {
   reasoningEffort?: string;
 }
 
+export interface CodexModelInfo {
+  slug: string;
+  displayName: string;
+  priority: number;
+  defaultReasoningLevel?: string;
+  supportedReasoningLevels: string[];
+}
+
 export interface CodexDiscoveryResult {
   codexPath: string;
   version: string;
   tomlDefaultModel?: string;
   tomlReasoningEffort?: string;
+  availableModels: CodexModelInfo[];
+  flagshipModel?: string;
 }
 
 function isExecutable(filePath: string): boolean {
@@ -26,8 +56,69 @@ function isExecutable(filePath: string): boolean {
     if (!existsSync(filePath)) return false;
     accessSync(filePath, constants.X_OK);
     return true;
-  } catch {
+  } catch (err) {
+    // SAFETY: accessSync throws an ErrnoException when the binary is missing or not executable.
+    const code = (err as NodeJS.ErrnoException | null)?.code;
+    if (code === "ENOENT" || code === "EACCES" || code === "EPERM" || code === "ENOTDIR") {
+      return false;
+    }
     return false;
+  }
+}
+
+function getCodexHomeDir(): string {
+  const override = process.env.CODEX_HOME?.trim();
+  return override || join(homedir(), ".codex");
+}
+
+/**
+ * Reads visible models from `~/.codex/models_cache.json` sorted by priority
+ * ascending (priority 1 = latest flagship). Never throws on missing/malformed files.
+ */
+export function readCodexModelsCache(
+  cachePath = join(getCodexHomeDir(), "models_cache.json"),
+): CodexModelInfo[] {
+  try {
+    if (!existsSync(cachePath)) return [];
+    const raw = readFileSync(cachePath, "utf8");
+    const parsed = CodexModelsCacheSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success || !parsed.data.models) return [];
+
+    const models: CodexModelInfo[] = [];
+    for (const m of parsed.data.models) {
+      if (m.visibility !== "list") continue;
+      const slug = m.slug?.trim();
+      if (!slug) continue;
+
+      const displayName = m.display_name?.trim() || slug;
+      const priority = m.priority ?? Number.MAX_SAFE_INTEGER;
+      const defaultReasoningLevel = m.default_reasoning_level?.trim() || undefined;
+
+      const supportedReasoningLevels: string[] = [];
+      for (const lvl of m.supported_reasoning_levels ?? []) {
+        const effort = lvl.effort?.trim();
+        if (effort) supportedReasoningLevels.push(effort);
+      }
+
+      const modelInfo: CodexModelInfo = {
+        slug,
+        displayName,
+        priority,
+        supportedReasoningLevels,
+      };
+      if (defaultReasoningLevel) {
+        modelInfo.defaultReasoningLevel = defaultReasoningLevel;
+      }
+      models.push(modelInfo);
+    }
+
+    models.sort((a, b) => a.priority - b.priority);
+    return models;
+  } catch (err) {
+    if (process.env.DISTILL_DEBUG) {
+      console.warn(`[codex-discovery] Failed to read models cache: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return [];
   }
 }
 
@@ -36,7 +127,7 @@ function isExecutable(filePath: string): boolean {
  * (read-only, optional). Never throws on missing or malformed files.
  */
 export function readCodexConfigToml(
-  tomlPath = join(homedir(), ".codex", "config.toml"),
+  tomlPath = join(getCodexHomeDir(), "config.toml"),
 ): CodexTomlDefaults {
   try {
     if (!existsSync(tomlPath)) return {};
@@ -62,7 +153,10 @@ export function readCodexConfigToml(
     }
 
     return result;
-  } catch {
+  } catch (err) {
+    if (process.env.DISTILL_DEBUG) {
+      console.warn(`[codex-discovery] Failed to read config.toml: ${err instanceof Error ? err.message : String(err)}`);
+    }
     return {};
   }
 }
@@ -102,7 +196,10 @@ function parseCodexVersion(rawStdout: string): string {
   return match?.[1] ?? trimmed;
 }
 
-export function discoverCodex(options?: { tomlPath?: string }): CodexDiscoveryResult {
+export function discoverCodex(options?: {
+  tomlPath?: string;
+  modelsCachePath?: string;
+}): CodexDiscoveryResult {
   const codexPath = findCodexExecutable();
   if (!codexPath) {
     const override = process.env.DISTILL_CODEX_PATH?.trim();
@@ -111,9 +208,8 @@ export function discoverCodex(options?: { tomlPath?: string }): CodexDiscoveryRe
       : `Could not find the "codex" CLI on PATH or in standard install directories.`;
     throw new CodexNotFoundError(
       `${detail}\n` +
-        `Install & authenticate Codex CLI (e.g. \`npm i -g @openai/codex && codex login\`), ` +
-        `set DISTILL_CODEX_PATH, or pass an explicit model from another provider ` +
-        `(e.g. \`--model anthropic:claude-sonnet-4-5\` or \`--model openai:gpt-4.1\`).`,
+        `distill-anything uses Codex CLI exclusively. Install & authenticate Codex CLI ` +
+        `(e.g. \`bun add -g @openai/codex && codex login\`) or set DISTILL_CODEX_PATH.`,
     );
   }
 
@@ -126,18 +222,23 @@ export function discoverCodex(options?: { tomlPath?: string }): CodexDiscoveryRe
     throw new CodexNotFoundError(
       `Found codex at "${codexPath}" but \`codex --version\` exited with code ${probe.exitCode}` +
         `${stderr ? `: ${stderr}` : "."}\n` +
-        `Verify your Codex CLI installation or pass an explicit \`--model <provider>:<model>\`.`,
+        `Verify your Codex CLI installation.`,
     );
   }
 
   const stdout = new TextDecoder().decode(probe.stdout);
   const version = parseCodexVersion(stdout) || "unknown";
   const toml = readCodexConfigToml(options?.tomlPath);
+  const availableModels = readCodexModelsCache(options?.modelsCachePath);
+  const flagshipModel = availableModels[0]?.slug;
 
-  return {
+  const result: CodexDiscoveryResult = {
     codexPath,
     version,
-    ...(toml.model ? { tomlDefaultModel: toml.model } : {}),
-    ...(toml.reasoningEffort ? { tomlReasoningEffort: toml.reasoningEffort } : {}),
+    availableModels,
   };
+  if (toml.model) result.tomlDefaultModel = toml.model;
+  if (toml.reasoningEffort) result.tomlReasoningEffort = toml.reasoningEffort;
+  if (flagshipModel) result.flagshipModel = flagshipModel;
+  return result;
 }
