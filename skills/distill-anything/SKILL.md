@@ -36,8 +36,8 @@ Convert codebases, GitHub organizations, or session findings into verified Agent
    distill-anything merge <skill-dir-1> <skill-dir-2> --name <unified-slug> --out <target>/.claude/skills
    ```
 
-## Provider & Post-Run Report
+## Provider & Pre-Run Permission
 
-- Default provider: local **Codex CLI** (`distill-anything config` sets model & reasoning).
-- Overrides: `--model <provider:model>`, `--reasoning <low|medium|high|xhigh>`, `--min-novelty <1-5>`.
-- Read `<out>/<slug>/distill-report.json` and report `patternsKept`, `patternsDropped`, `groundingFailures`, and `totalCostUsd`.
+- **Codex CLI only** (no APIs). Confirm model + reasoning effort (`low|medium|high|xhigh|max|ultra`) or use saved config (`--model codex:<model> --reasoning <effort>`).
+- **Publish by default**: Never pass `--no-publish` unless explicitly requested.
+- Report `patternsKept`, `patternsDropped`, `groundingFailures`, and `totalCostUsd` from `<out>/<slug>/distill-report.json`.

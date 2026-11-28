@@ -30,14 +30,22 @@
   ],
   "bin": {
     "distill-anything": "./bin/distill-anything.ts",
-    "distill": "./bin/distill-anything.ts"
+    "distill": "./bin/distill-anything.ts",
+    "distill-anything-mcp": "./bin/mcp-server.ts"
   },
   "files": [
     "bin/",
     "src/",
     "prompts/",
     "skills/",
+    "agents/",
+    "rules/",
+    "hooks/",
+    "assets/",
     "grammars/",
+    "plugin.json",
+    "mcp_config.json",
+    "hooks.json",
     "README.md",
     "LICENSE"
   ],
@@ -51,6 +59,7 @@
     "test": "bun test",
     "build:bin": "bun build --compile bin/distill-anything.ts --outfile dist/distill-anything",
     "install:skill": "bun -e \"import { cpSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'; import { homedir } from 'node:os'; import { join, resolve } from 'node:path'; const src = resolve('skills/distill-anything'); for (const base of ['.claude/skills', '.agents/skills']) { const dir = join(homedir(), base); const dest = join(dir, 'distill-anything'); const legacy = join(dir, 'repo-to-skill'); mkdirSync(dir, { recursive: true }); rmSync(legacy, { recursive: true, force: true }); rmSync(dest, { recursive: true, force: true }); try { symlinkSync(src, dest); } catch { cpSync(src, dest, { recursive: true }); } console.log('Installed ->', dest); }\"",
+    "install:plugin": "bun -e \"import { cpSync, mkdirSync, rmSync, symlinkSync } from 'node:fs'; import { homedir } from 'node:os'; import { join, resolve } from 'node:path'; const src = resolve('.'); const dir = join(homedir(), '.gemini/config/plugins'); const dest = join(dir, 'distill-anything'); mkdirSync(dir, { recursive: true }); rmSync(dest, { recursive: true, force: true }); try { symlinkSync(src, dest); } catch { cpSync(src, dest, { recursive: true }); } console.log('Installed plugin ->', dest);\"",
     "check": "bun run typecheck && bun run test"
   },
   "dependencies": {
